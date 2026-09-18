@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../games/four_in_a_row/logic/four_in_a_row_game.dart';
 import '../../../games/four_in_a_row/models/four_in_a_row_models.dart';
-import '../../../widgets/game_result_dialog.dart';
+import '../../game_result_screen.dart';
 
-/// Four in a Row landscape gameplay screen.
+/// Finalized Four in a Row landscape gameplay screen.
 ///
-/// Implements permanent Blue/Red player identities, anchored semicircle turn
-/// indicators, floating white winning line overlay, 3-dot options menu
-/// (Exit, Restart, Revert), and integrated result flow.
+/// Features:
+/// - Landscape layout with intentional surrounding background spacing (not full-screen)
+/// - Dynamic player-family background reaction
+/// - Semicircle/curved turn indicators anchored to bottom screen edges (only active visible)
+/// - 3-dot options menu (Exit Game, Restart, Revert)
+/// - Normal discs with animated floating white winning line overlay
+/// - Full-screen celebratory GameResultScreen with 3s auto-exit countdown
 class FourInARowScreen extends StatefulWidget {
   const FourInARowScreen({super.key});
 
@@ -16,7 +20,8 @@ class FourInARowScreen extends StatefulWidget {
   State<FourInARowScreen> createState() => _FourInARowScreenState();
 }
 
-class _FourInARowScreenState extends State<FourInARowScreen> {
+class _FourInARowScreenState extends State<FourInARowScreen>
+    with SingleTickerProviderStateMixin {
   final FourInARowGame _game = FourInARowGame();
 
   // Permanent Player Colors
@@ -24,10 +29,12 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
   static const Color _redPlayerColor = Color(0xFFFF5E57); // Player 2 / Right
 
   // Board Styling
-  static const Color _boardColor = Color(0xFF1565C0); // Vivid Classic Blue
+  static const Color _boardColor = Color(0xFF1565C0); // Classic Vivid Blue
   static const Color _holeColor = Color(0xFF0D47A1); // Deep Slot Color
 
-  bool _isResultDialogOpen = false;
+  late final AnimationController _winningLineController;
+  late final Animation<double> _winningLineAnimation;
+  bool _isTransitioningToResult = false;
 
   @override
   void initState() {
@@ -37,10 +44,21 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+
+    _winningLineController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+
+    _winningLineAnimation = CurvedAnimation(
+      parent: _winningLineController,
+      curve: Curves.easeInOutCubic,
+    );
   }
 
   @override
   void dispose() {
+    _winningLineController.dispose();
     // Restore all orientations when leaving
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -52,7 +70,7 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
   }
 
   void _onColumnTap(int col) {
-    if (_game.isGameOver) return;
+    if (_game.isGameOver || _isTransitioningToResult) return;
     if (_game.isColumnFull(col)) return;
 
     setState(() {
@@ -60,28 +78,36 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
     });
 
     if (_game.status == FourInARowGameStatus.won) {
-      // Allow winning line highlight to be seen briefly before presenting result dialog
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (!mounted || _isResultDialogOpen) return;
-        _showResultDialog();
+      _isTransitioningToResult = true;
+      // Start drawing the white line with animation
+      _winningLineController.forward(from: 0.0);
+
+      // Transition to full-screen result page after line draws and stays visible briefly
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (!mounted) return;
+        _navigateToResultScreen();
       });
     } else if (_game.status == FourInARowGameStatus.draw) {
+      _isTransitioningToResult = true;
       Future.delayed(const Duration(milliseconds: 600), () {
-        if (!mounted || _isResultDialogOpen) return;
-        _showResultDialog();
+        if (!mounted) return;
+        _navigateToResultScreen();
       });
     }
   }
 
   void _revertMove() {
-    if (!_game.canRevert) return;
+    if (!_game.canRevert || _isTransitioningToResult) return;
     setState(() {
+      _winningLineController.reset();
       _game.revert();
     });
   }
 
   void _restartGame() {
     setState(() {
+      _isTransitioningToResult = false;
+      _winningLineController.reset();
       _game.reset();
     });
   }
@@ -90,47 +116,29 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
     Navigator.of(context).pop();
   }
 
-  void _showResultDialog() {
-    _isResultDialogOpen = true;
-
+  void _navigateToResultScreen() {
     final isBlueWinner = _game.winner == FourInARowPlayer.player1;
     final isRedWinner = _game.winner == FourInARowPlayer.player2;
 
-    String title;
-    Color themeColor;
-    IconData icon;
-
+    GameResultData resultData;
     if (isBlueWinner) {
-      title = 'BLUE PLAYER WIN';
-      themeColor = _bluePlayerColor;
-      icon = Icons.emoji_events_rounded;
+      resultData = GameResultData.blueWin(label: 'BLUE PLAYER WINS');
     } else if (isRedWinner) {
-      title = 'RED PLAYER WIN';
-      themeColor = _redPlayerColor;
-      icon = Icons.emoji_events_rounded;
+      resultData = GameResultData.redWin(label: 'RED PLAYER WINS');
     } else {
-      title = 'DRAW';
-      themeColor = const Color(0xFF546E7A);
-      icon = Icons.handshake_rounded;
+      resultData = GameResultData.draw(label: 'DRAW');
     }
 
-    GameResultDialog.show(
+    GameResultScreen.show(
       context,
-      title: title,
-      themeColor: themeColor,
-      icon: icon,
-      autoExitSeconds: 3,
+      resultData: resultData,
       onPlayAgain: () {
-        _isResultDialogOpen = false;
         _restartGame();
       },
       onExit: () {
-        _isResultDialogOpen = false;
         _exitGame();
       },
-    ).then((_) {
-      _isResultDialogOpen = false;
-    });
+    );
   }
 
   @override
@@ -138,59 +146,66 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
     final isBlueTurn = _game.currentPlayer == FourInARowPlayer.player1;
     final activeColor = isBlueTurn ? _bluePlayerColor : _redPlayerColor;
 
+    // Dynamic background color tint based on active player's color family
+    final backgroundColor = isBlueTurn
+        ? const Color(0xFFE3F2FD) // Soft Blue Family Tint
+        : const Color(0xFFFFEBEE); // Soft Red Family Tint
+
     return PopScope(
       canPop: true,
       child: Scaffold(
         body: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          color: activeColor.withValues(alpha: 0.08),
+          duration: const Duration(milliseconds: 350),
+          color: backgroundColor,
           child: SafeArea(
             child: Stack(
               children: [
-                // ── Main Landscape Gameplay Content ────────────────────────
-                Row(
-                  children: [
-                    // Left: Blue Player 1 Turn Indicator
-                    _buildPlayerSide(
-                      player: FourInARowPlayer.player1,
-                      label: 'BLUE',
-                      color: _bluePlayerColor,
-                      isActive: !_game.isGameOver && isBlueTurn,
-                      isLeft: true,
-                    ),
+                // ── Centered Game Board with Intentional Surrounding Background ──
+                Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Constraint board height to ensure clear surrounding background space
+                      final maxBoardHeight = constraints.maxHeight * 0.76;
+                      final maxBoardWidth = maxBoardHeight * (FourInARowGame.cols / FourInARowGame.rows);
 
-                    // Center: 7x6 Interactive Board
-                    Expanded(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
-                          child: AspectRatio(
-                            aspectRatio: FourInARowGame.cols / FourInARowGame.rows,
-                            child: _buildBoard(),
-                          ),
-                        ),
-                      ),
-                    ),
+                      return SizedBox(
+                        height: maxBoardHeight,
+                        width: maxBoardWidth,
+                        child: _buildBoard(),
+                      );
+                    },
+                  ),
+                ),
 
-                    // Right: Red Player 2 Turn Indicator
-                    _buildPlayerSide(
-                      player: FourInARowPlayer.player2,
-                      label: 'RED',
-                      color: _redPlayerColor,
-                      isActive: !_game.isGameOver && !isBlueTurn,
-                      isLeft: false,
-                    ),
-                  ],
+                // ── Left Semicircle Turn Indicator (Blue) ───────────────────
+                Positioned(
+                  left: 0,
+                  bottom: 0,
+                  child: _buildSemicircleIndicator(
+                    color: _bluePlayerColor,
+                    label: 'BLUE TURN',
+                    isVisible: !_game.isGameOver && isBlueTurn,
+                    isLeft: true,
+                  ),
+                ),
+
+                // ── Right Semicircle Turn Indicator (Red) ────────────────────
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: _buildSemicircleIndicator(
+                    color: _redPlayerColor,
+                    label: 'RED TURN',
+                    isVisible: !_game.isGameOver && !isBlueTurn,
+                    isLeft: false,
+                  ),
                 ),
 
                 // ── Top-Right Options 3-Dot Menu ───────────────────────────
                 Positioned(
-                  top: 4,
-                  right: 4,
-                  child: _buildOptionsMenu(),
+                  top: 8,
+                  right: 12,
+                  child: _buildOptionsMenu(activeColor),
                 ),
               ],
             ),
@@ -201,17 +216,17 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
   }
 
   /// Builds the 3-dot options menu containing Exit Game, Restart, and Revert.
-  Widget _buildOptionsMenu() {
+  Widget _buildOptionsMenu(Color activeColor) {
     return PopupMenuButton<String>(
       icon: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
+          color: Colors.white,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 4,
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -219,11 +234,12 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
         child: const Icon(
           Icons.more_vert_rounded,
           color: Colors.black87,
-          size: 20,
+          size: 22,
         ),
       ),
       tooltip: 'Options',
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       onSelected: (value) {
         switch (value) {
           case 'revert':
@@ -245,14 +261,14 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
             children: [
               Icon(
                 Icons.undo_rounded,
-                color: _game.canRevert ? Colors.black87 : Colors.grey,
+                color: _game.canRevert ? Colors.black87 : Colors.grey.shade400,
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 'Revert',
                 style: TextStyle(
-                  color: _game.canRevert ? Colors.black87 : Colors.grey,
+                  color: _game.canRevert ? Colors.black87 : Colors.grey.shade400,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -290,139 +306,99 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
     );
   }
 
-  /// Builds the side player column with the anchored semicircle turn indicator.
-  Widget _buildPlayerSide({
-    required FourInARowPlayer player,
-    required String label,
-    required Color color,
-    required bool isActive,
-    required bool isLeft,
-  }) {
-    return SizedBox(
-      width: 110,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment:
-            isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-        children: [
-          // Player Avatar Badge
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 250),
-              opacity: isActive ? 1.0 : 0.6,
-              child: Column(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 2.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.4),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      player == FourInARowPlayer.player1
-                          ? Icons.person_rounded
-                          : Icons.person_outline_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    player.displayName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                      color: isActive ? color : Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const Spacer(),
-
-          // Anchored Semicircle Turn Indicator
-          _buildSemicircleIndicator(
-            color: color,
-            label: '$label TURN',
-            isActive: isActive,
-            isLeft: isLeft,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Semicircle turn indicator anchored to the bottom screen edge.
+  /// Semicircle/curved turn indicator attached to the bottom screen edge.
+  ///
+  /// Only the active player's semicircle is visible on screen.
   Widget _buildSemicircleIndicator({
     required Color color,
     required String label,
-    required bool isActive,
+    required bool isVisible,
     required bool isLeft,
   }) {
+    // Semicircle curvature attached to edge and baseline
     final borderRadius = isLeft
         ? const BorderRadius.only(
-            topRight: Radius.circular(32),
-            bottomRight: Radius.circular(8),
+            topRight: Radius.circular(60),
           )
         : const BorderRadius.only(
-            topLeft: Radius.circular(32),
-            bottomLeft: Radius.circular(8),
+            topLeft: Radius.circular(60),
           );
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeInOut,
-      width: isActive ? 108 : 96,
-      height: 46,
-      padding: EdgeInsets.only(
-        left: isLeft ? 10 : 8,
-        right: isLeft ? 8 : 10,
-        top: 6,
-        bottom: 6,
-      ),
-      decoration: BoxDecoration(
-        color: isActive ? color : color.withValues(alpha: 0.2),
-        borderRadius: borderRadius,
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOutBack,
+      offset: isVisible
+          ? Offset.zero
+          : (isLeft ? const Offset(-1.2, 0) : const Offset(1.2, 0)),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: isVisible ? 1.0 : 0.0,
+        child: Container(
+          width: 155,
+          height: 62,
+          padding: EdgeInsets.only(
+            left: isLeft ? 14 : 10,
+            right: isLeft ? 10 : 14,
+            top: 10,
+            bottom: 6,
+          ),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: borderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.45),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          alignment: isLeft ? Alignment.centerLeft : Alignment.centerRight,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isLeft) ...[
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ]
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: isActive ? Colors.white : color.withValues(alpha: 0.9),
-          fontWeight: FontWeight.w900,
-          fontSize: 12,
-          letterSpacing: 0.5,
+                if (!isLeft) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  /// Interactive 7x6 board with column tap gestures and floating winning line overlay.
+  /// Interactive 7x6 board with column tap gestures and animated floating white winning line.
   Widget _buildBoard() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -431,16 +407,16 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
 
         return Stack(
           children: [
-            // Blue Board Frame with Holes
+            // Blue Board Frame with Disc Slots
             Container(
               decoration: BoxDecoration(
                 color: _boardColor,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.shade900.withValues(alpha: 0.4),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+                    color: Colors.blue.shade900.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
@@ -466,16 +442,22 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
               ),
             ),
 
-            // Floating White Winning Line Overlay
+            // Animated Floating White Winning Line Overlay
             if (_game.status == FourInARowGameStatus.won &&
                 _game.winningPositions.length >= FourInARowGame.connectCount)
               Positioned.fill(
-                child: CustomPaint(
-                  painter: _WinningLinePainter(
-                    winningPositions: _game.winningPositions,
-                    cellWidth: cellWidth,
-                    cellHeight: cellHeight,
-                  ),
+                child: AnimatedBuilder(
+                  animation: _winningLineAnimation,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      painter: _AnimatedWinningLinePainter(
+                        winningPositions: _game.winningPositions,
+                        cellWidth: cellWidth,
+                        cellHeight: cellHeight,
+                        progress: _winningLineAnimation.value,
+                      ),
+                    );
+                  },
                 ),
               ),
           ],
@@ -524,21 +506,23 @@ class _FourInARowScreenState extends State<FourInARowScreen> {
   }
 }
 
-/// Custom painter that draws a crisp floating white line overlay over the winning 4 discs.
-class _WinningLinePainter extends CustomPainter {
+/// Custom painter that draws a smoothly animated floating white line overlay over the winning 4 discs.
+class _AnimatedWinningLinePainter extends CustomPainter {
   final List<BoardPosition> winningPositions;
   final double cellWidth;
   final double cellHeight;
+  final double progress;
 
-  _WinningLinePainter({
+  _AnimatedWinningLinePainter({
     required this.winningPositions,
     required this.cellWidth,
     required this.cellHeight,
+    required this.progress,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (winningPositions.length < 4) return;
+    if (winningPositions.length < 4 || progress <= 0.0) return;
 
     final first = winningPositions.first;
     final last = winningPositions.last;
@@ -549,21 +533,24 @@ class _WinningLinePainter extends CustomPainter {
       (first.row * cellHeight) + (cellHeight / 2),
     );
 
-    final endOffset = Offset(
+    final fullEndOffset = Offset(
       (last.col * cellWidth) + (cellWidth / 2),
       (last.row * cellHeight) + (cellHeight / 2),
     );
 
+    // Interpolate end coordinate based on animation progress
+    final currentEndOffset = Offset.lerp(startOffset, fullEndOffset, progress)!;
+
     // Subtle drop shadow under the line
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.3)
+      ..color = Colors.black.withValues(alpha: 0.35)
       ..strokeWidth = 9.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
     canvas.drawLine(
       startOffset.translate(0, 2),
-      endOffset.translate(0, 2),
+      currentEndOffset.translate(0, 2),
       shadowPaint,
     );
 
@@ -574,12 +561,13 @@ class _WinningLinePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    canvas.drawLine(startOffset, endOffset, linePaint);
+    canvas.drawLine(startOffset, currentEndOffset, linePaint);
   }
 
   @override
-  bool shouldRepaint(covariant _WinningLinePainter oldDelegate) {
-    return oldDelegate.winningPositions != winningPositions ||
+  bool shouldRepaint(covariant _AnimatedWinningLinePainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.winningPositions != winningPositions ||
         oldDelegate.cellWidth != cellWidth ||
         oldDelegate.cellHeight != cellHeight;
   }
