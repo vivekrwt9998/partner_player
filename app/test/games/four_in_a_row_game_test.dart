@@ -27,6 +27,23 @@ void main() {
   });
 
   group('FourInARowGame - Move and Gravity Mechanics', () {
+    test('returns the applied move with its engine-calculated landing row', () {
+      final game = FourInARowGame();
+
+      final firstMove = game.tryDropDisc(3);
+      expect(firstMove, isNotNull);
+      expect(firstMove!.player, FourInARowPlayer.player1);
+      expect(firstMove.column, 3);
+      expect(firstMove.row, 5);
+      expect(firstMove.status, FourInARowGameStatus.playing);
+      expect(firstMove.winner, isNull);
+
+      final secondMove = game.tryDropDisc(3);
+      expect(secondMove, isNotNull);
+      expect(secondMove!.player, FourInARowPlayer.player2);
+      expect(secondMove.row, 4);
+    });
+
     test('drops disc to the lowest empty row and alternates turns', () {
       final game = FourInARowGame();
 
@@ -313,11 +330,9 @@ void main() {
         }
       }
 
-      if (game.status == FourInARowGameStatus.draw) {
-        expect(game.status, FourInARowGameStatus.draw);
-        expect(game.winner, isNull);
-        expect(game.isGameOver, isTrue);
-      }
+      expect(game.status, FourInARowGameStatus.draw);
+      expect(game.winner, isNull);
+      expect(game.isGameOver, isTrue);
     });
 
     test('rejects moves after a player has won', () {

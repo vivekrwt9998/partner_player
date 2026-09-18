@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/main.dart';
 import 'package:app/screens/game_result_screen.dart';
+import 'package:app/screens/games/four_in_a_row/four_in_a_row_screen.dart';
 
 void main() {
   testWidgets('Complete Flow: Lobby -> Details -> Landscape Gameplay with Single Active Indicator',
@@ -77,7 +78,7 @@ void main() {
                 onPressed: () {
                   GameResultScreen.show(
                     context,
-                    resultData: GameResultData.blueWin(label: 'BLUE PLAYER WINS'),
+                    resultData: GameResultData.blueWin(label: 'BLUE PLAYER\nWINS!'),
                     onPlayAgain: () => playAgainCalled = true,
                     onExit: () => exitCalled = true,
                   );
@@ -94,14 +95,14 @@ void main() {
     await tester.tap(find.text('Show Result'));
     await tester.pumpAndSettle();
 
-    expect(find.text('BLUE PLAYER WINS'), findsOneWidget);
-    expect(find.text('Auto exit in 3'), findsOneWidget);
+    expect(find.text('BLUE PLAYER\nWINS!'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
     expect(find.text('PLAY AGAIN'), findsOneWidget);
     expect(find.text('EXIT'), findsOneWidget);
 
-    // Advance 1 second -> Auto exit in 2
+    // Advance 1 second -> Countdown becomes 2
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Auto exit in 2'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
 
     // Tap Play Again
     await tester.tap(find.text('PLAY AGAIN'));
@@ -109,6 +110,29 @@ void main() {
 
     expect(playAgainCalled, isTrue);
     expect(exitCalled, isFalse);
-    expect(find.text('BLUE PLAYER WINS'), findsNothing);
+    expect(find.text('BLUE PLAYER\nWINS!'), findsNothing);
+  });
+
+  testWidgets('Bot mode opens the shared gameplay screen without Revert',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(const PartnerGameApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Four in a Row'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Play with Bot'));
+    await tester.tap(find.text('Play with Bot'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FourInARowScreen), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Restart'), findsOneWidget);
+    expect(find.text('Exit Game'), findsOneWidget);
+    expect(find.text('Revert'), findsNothing);
   });
 }

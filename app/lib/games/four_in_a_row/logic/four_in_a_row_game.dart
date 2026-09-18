@@ -66,11 +66,12 @@ class FourInARowGame {
     return !isColumnFull(col);
   }
 
-  /// Drops a disc for [currentPlayer] into column [col].
+  /// Applies a disc drop for [currentPlayer] and returns its resolved outcome.
   ///
-  /// Returns `true` if the move was valid and applied, `false` otherwise.
-  bool dropDisc(int col) {
-    if (!canDrop(col)) return false;
+  /// `null` means the column was invalid, full, or the game had already ended.
+  /// The returned row is the authoritative landing row for this engine move.
+  FourInARowMove? tryDropDisc(int col) {
+    if (!canDrop(col)) return null;
 
     // Find the lowest empty cell in this column
     int targetRow = -1;
@@ -81,30 +82,56 @@ class FourInARowGame {
       }
     }
 
-    if (targetRow == -1) return false;
+    if (targetRow == -1) return null;
 
     // Place the piece & record history
-    _board[targetRow][col] = _currentPlayer;
-    _moveHistory.add((row: targetRow, col: col, player: _currentPlayer));
+    final movingPlayer = _currentPlayer;
+    _board[targetRow][col] = movingPlayer;
+    _moveHistory.add((row: targetRow, col: col, player: movingPlayer));
 
     // Check for win
-    final winningLine = _checkWin(targetRow, col, _currentPlayer);
+    final winningLine = _checkWin(targetRow, col, movingPlayer);
     if (winningLine != null) {
       _status = FourInARowGameStatus.won;
-      _winner = _currentPlayer;
+      _winner = movingPlayer;
       _winningPositions = winningLine;
-      return true;
+      return FourInARowMove(
+        player: movingPlayer,
+        column: col,
+        row: targetRow,
+        status: _status,
+        winner: _winner,
+      );
     }
 
     // Check for draw
     if (_isBoardFull()) {
       _status = FourInARowGameStatus.draw;
-      return true;
+      return FourInARowMove(
+        player: movingPlayer,
+        column: col,
+        row: targetRow,
+        status: _status,
+        winner: _winner,
+      );
     }
 
     // Switch turn
     _currentPlayer = _currentPlayer.opponent;
-    return true;
+    return FourInARowMove(
+      player: movingPlayer,
+      column: col,
+      row: targetRow,
+      status: _status,
+      winner: _winner,
+    );
+  }
+
+  /// Drops a disc for [currentPlayer] into column [col].
+  ///
+  /// Compatibility convenience for existing callers that only need success.
+  bool dropDisc(int col) {
+    return tryDropDisc(col) != null;
   }
 
   /// Reverts (undoes) the last valid move.

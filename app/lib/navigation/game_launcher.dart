@@ -11,9 +11,10 @@ class GameLauncher {
   static bool isModeAvailable(GameDefinition game, GameMode mode) {
     if (game.status != GameStatus.available) return false;
 
-    // Current phase: only Four in a Row + Local is fully playable offline
+    // Current phase: Four in a Row supports its offline Local and Bot modes.
     return switch ((game.id, mode)) {
       ('four_in_a_row', GameMode.local) => true,
+      ('four_in_a_row', GameMode.bot) => true,
       _ => false,
     };
   }
@@ -53,7 +54,10 @@ class GameLauncher {
   /// Resolves game ID and mode pair to its corresponding gameplay screen.
   static Widget? _resolveScreen(String gameId, GameMode mode) {
     return switch ((gameId, mode)) {
-      ('four_in_a_row', GameMode.local) => const FourInARowScreen(),
+      ('four_in_a_row', GameMode.local) =>
+        const FourInARowScreen(mode: GameMode.local),
+      ('four_in_a_row', GameMode.bot) =>
+        const FourInARowScreen(mode: GameMode.bot),
       _ => null,
     };
   }

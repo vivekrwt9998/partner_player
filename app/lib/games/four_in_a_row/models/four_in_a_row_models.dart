@@ -18,6 +18,28 @@ enum FourInARowGameStatus {
   draw,
 }
 
+/// Immutable information about one successfully applied disc drop.
+///
+/// The game engine is the sole owner of the landing row calculation. Consumers
+/// such as the board animation use this value rather than recalculating it.
+class FourInARowMove {
+  final FourInARowPlayer player;
+  final int column;
+  final int row;
+  final FourInARowGameStatus status;
+  final FourInARowPlayer? winner;
+
+  const FourInARowMove({
+    required this.player,
+    required this.column,
+    required this.row,
+    required this.status,
+    required this.winner,
+  });
+
+  bool get isTerminal => status != FourInARowGameStatus.playing;
+}
+
 /// Represents a grid coordinate on the board.
 ///
 /// [row] ranges from 0 (top) to 5 (bottom).
