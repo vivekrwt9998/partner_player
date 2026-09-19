@@ -22,6 +22,14 @@ const List<GameDefinition> kGames = [
       GameMode.bot,
       GameMode.online,
     ],
+    // Board sits flat between two players, each dropping discs from their
+    // own side; it is not handed back and forth. See AGENTS.md §7 / §10.1.4.
+    localInteractionType: LocalInteractionType.sharedDevice,
+    turnIndicatorLayout: TurnIndicatorLayout.sideBySide,
+    // The board is always landscape-shaped (7 wide x 6 tall), fit/scaled to
+    // whatever space is available. Never rotates the device or the pixels;
+    // discs always fall top -> bottom. See AGENTS.md §8.
+    orientationBehavior: GameOrientationBehavior.fixedLandscape,
     tags: ['2 Players', 'Offline Ready'],
     howToPlayRules: [
       'Players take turns dropping one colored disc into any of the 7 columns.',
@@ -36,12 +44,20 @@ const List<GameDefinition> kGames = [
     description: 'The classic 3×3 showdown. Get three in a row to claim victory.',
     icon: Icons.grid_3x3_rounded,
     playerCount: 2,
-    status: GameStatus.comingSoon,
+    status: GameStatus.available,
     supportedModes: [
       GameMode.local,
       GameMode.bot,
       GameMode.online,
     ],
+    // Players sit opposite each other reaching the same flat device, one
+    // near/bottom (Blue) and one far/top (Red). See AGENTS.md §10.1.2.
+    localInteractionType: LocalInteractionType.sharedDevice,
+    turnIndicatorLayout: TurnIndicatorLayout.faceToFace,
+    // A 3x3 board is square, so it reads the same whether the device is
+    // portrait or landscape; the composition always stays stacked
+    // top-board-bottom (never a side-by-side layout). See AGENTS.md §8.
+    orientationBehavior: GameOrientationBehavior.fixedPortrait,
     tags: ['2 Players'],
     howToPlayRules: [
       'Take turns placing your mark (X or O) on any empty cell in the 3×3 grid.',
@@ -60,6 +76,9 @@ const List<GameDefinition> kGames = [
       GameMode.online,
       GameMode.bot,
     ],
+    // Placeholder only: Battleship has no gameplay screen yet, so its board
+    // shape hasn't actually been designed. Revisit when it is built.
+    orientationBehavior: GameOrientationBehavior.adaptive,
     tags: ['2 Players'],
     howToPlayRules: [
       'Position your fleet of ships secretly on the ocean grid.',

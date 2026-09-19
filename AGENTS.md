@@ -2,49 +2,54 @@
 
 ## 1. Project Identity
 
-This repository contains a multi-game multiplayer platform currently built with:
+This project is a mobile multiplayer game platform built with:
 
-* Flutter / Dart for the mobile application
-* Node.js / Express for the backend
-* Socket.IO for real-time multiplayer communication
-* MongoDB / MongoDB Atlas for persistent data
+* Flutter / Dart
+* Node.js
+* Express.js
+* Socket.IO
+* MongoDB / MongoDB Atlas
 
-The application is currently named **Partner Play**, but the product name may change later.
+The product is designed for kids and casual players.
 
-The platform is designed primarily for kids and casual players.
+The overall experience should feel:
 
-The product should feel:
-
-* Friendly
 * Colorful
+* Friendly
 * Playful
 * Cartoon-inspired
-* Simple to understand
+* Simple
 * Fast
-* Smooth
 * Lightweight
-* Responsive
-* Easy to extend with new games
+* Easy to understand
+* Easy to extend
 
-The application is not limited to two-player games.
+The platform supports different types of games, including:
 
-Each game can define its own supported player count.
+* 2-player games
+* 2–4 player games
+* Single-player games
+* Turn-based games
+* Real-time games
+* Offline/local multiplayer
+* Online multiplayer
+* Bot-based games
 
-Examples:
+Example games may include:
 
-* Tic Tac Toe → 2 players
-* Four in a Row → 2 players
-* Ludo → potentially 2–4 players
-* Carrom → potentially 2–4 players
-* Single-player games → 1 player
+* Tic Tac Toe
+* Four in a Row / Connect 4
+* Ludo
+* Carrom
+* Future games
 
-Do not assume that every game has the same player count, orientation, interaction model, timer rules, or game structure.
+The architecture must support adding new games without rewriting platform-wide systems.
 
 ---
 
-# 2. Core Product Principles
+# 2. Core Engineering Principles
 
-Always prioritize the following:
+Always prioritize:
 
 1. Correctness
 2. User experience
@@ -53,2509 +58,1864 @@ Always prioritize the following:
 5. Maintainability
 6. Scalability
 7. Simplicity
+8. Reusability
 
-Do not optimize only for fewer lines of code.
+Do not optimize for clever code.
 
-Do not optimize only for fewer files.
-
-Do not optimize only for the smallest possible implementation.
-
-The goal is:
-
-> Simple architecture + reusable code + correct behavior + good performance.
-
-Avoid unnecessary complexity, but do not sacrifice architecture merely to make the implementation shorter.
+Prefer code that another developer can easily understand and maintain.
 
 ---
 
 # 3. Understand Before Changing
 
-Before modifying code:
+Before modifying existing code:
 
-1. Inspect the existing project structure.
-2. Inspect related screens/components.
-3. Inspect existing services and utilities.
-4. Inspect existing state-management patterns.
-5. Inspect API and Socket.IO patterns.
-6. Inspect reusable components before creating new ones.
-7. Read relevant documentation under `docs/`.
-8. Understand why the existing implementation exists.
-9. Determine whether the requested functionality already partially exists.
-10. Plan the smallest appropriate change.
+1. Inspect the repository structure.
+2. Read the relevant existing implementation.
+3. Inspect related:
 
-Never blindly create a new implementation when an existing implementation can reasonably be reused or extended.
+   * Screens
+   * Widgets
+   * Components
+   * State management
+   * Services
+   * API calls
+   * Socket events
+   * Models
+   * Navigation
+   * Reusable components
+   * Game documentation
+4. Understand why the current implementation exists.
+5. Identify reusable functionality before creating new functionality.
+6. Plan the smallest appropriate change.
+7. Only then implement.
 
-Do not rewrite unrelated working code.
+Do not blindly rewrite existing code.
 
-Do not refactor large parts of the application unless the task actually requires it.
+Do not replace working architecture simply because another implementation looks cleaner.
 
 ---
 
-# 4. Game Platform Architecture
+# 4. Platform Architecture
 
-The application is a platform containing multiple games.
-
-The architecture must allow new games to be added without repeatedly rewriting platform-level systems.
-
-The following systems should remain reusable across games whenever possible:
-
-* Authentication
-* User profile
-* Friends
-* Friend requests
-* Matchmaking
-* Game requests
-* Socket connection
-* Game sessions
-* Temporary chat
-* Timers
-* Reconnection
-* API client
-* Error handling
-* Loading states
-* Navigation
-* Common UI components
-* Analytics/logging if introduced later
-
-Game-specific logic must remain isolated from platform-wide functionality.
-
-Preferred conceptual architecture:
+Use the following conceptual separation:
 
 ```text
 UI
-  ↓
+ ↓
 Presentation / State
-  ↓
+ ↓
 Game Engine / Game Logic
-  ↓
-Services
-  ↓
+ ↓
+Platform Services
+ ↓
 API / Socket
-  ↓
+ ↓
 Backend
-  ↓
+ ↓
 Database
 ```
 
-Do not place complex game rules directly inside Flutter widgets.
+Game-specific logic must remain isolated from platform-wide functionality.
+
+Platform-wide systems should be reusable across games.
+
+Examples of platform-wide systems:
+
+* Authentication
+* Profile
+* Friends
+* Matchmaking
+* Game requests
+* Online sessions
+* Rooms
+* Socket connection
+* Reconnection
+* Temporary chat
+* Timers
+* API handling
+* Error handling
+* Loading states
+* Navigation
+* Common UI
+* Result handling
+
+Game-specific systems include:
+
+* Board rules
+* Win conditions
+* Piece movement
+* Legal moves
+* Game state transitions
+* Game-specific animations
+* Game-specific interaction rules
 
 ---
 
 # 5. Game Metadata
 
-Games should be represented using structured metadata rather than repeatedly hardcoding game information in UI code.
+Game metadata should be structured and data-driven.
 
-A game definition may include:
-
-* id
-* name
-* description
-* icon/image
-* supported player count
-* supported modes
-* supports bot
-* supports online play
-* supports offline play
-* supports chat
-* supports turn timer
-* default timer
-* orientation
-* local interaction type
-* availability/status
-
-Example conceptual structure:
+A game definition may contain information such as:
 
 ```text
-GameDefinition
-
-├── id
-├── name
-├── description
-├── asset
-├── supportedPlayerCounts
-├── supportedModes
-├── supportsBot
-├── supportsChat
-├── supportsTimer
-├── defaultTimer
-├── orientation
-├── localInteractionType
-└── status
+id
+name
+description
+asset
+playerCount
+supportedPlayerCounts
+supportedModes
+supportsBot
+supportsChat
+supportsTimer
+defaultTimer
+layoutOrientation
+localInteractionType
+turnIndicatorLayout
+status
 ```
 
-The UI should render game cards/lists from this data whenever practical.
+Do not duplicate game metadata across multiple screens.
 
-Avoid duplicating game metadata across multiple screens.
+Prefer one reusable source of truth.
+
+Before adding a new field, inspect the existing model and extend it instead of creating duplicate models.
 
 ---
 
 # 6. Game Modes
 
-A game may support one or more of the following modes:
+Games may support:
 
-* Offline
-* Online Random
-* Online Friend
-* Bot
+### Offline
+
+Played locally without an internet connection.
+
+### Online Random
+
+Play against a randomly matched online player.
+
+### Online Friend
+
+Play against a selected friend.
+
+### Bot
+
+Play against a simple local/remote bot implementation.
 
 Do not assume every game supports every mode.
 
-A game must explicitly define which modes it supports.
+Game metadata must define supported modes.
 
 ---
 
-# 7. Offline Multiplayer
-
-Offline means the game must work without internet connectivity.
-
-Offline multiplayer may use different interaction models.
-
-## 7.1 Shared Device / Simultaneous
-
-Multiple players interact with the same device without necessarily passing the phone between players.
-
-Examples:
-
-* Tic Tac Toe
-* Four in a Row
-* Ludo
-* Carrom
-
-The device can be positioned between players when appropriate.
-
-## 7.2 Pass & Play
-
-One player interacts with the device, then passes it to another player.
-
-The architecture must allow a game to specify its local interaction model.
+# 7. Offline Multiplayer Interaction Models
 
 Do not assume:
 
+> Turn-based = Pass & Play
+
+These are different concepts.
+
+### Shared Device / Simultaneous
+
+Both players interact with the device while the game is active.
+
+Example:
+
+* Carrom
+* Some board games
+
+### Pass & Play
+
+Players take turns physically passing the phone.
+
+Example:
+
 ```text
-Turn-based = Pass & Play
+Player 1 plays
+↓
+Turn ends
+↓
+Phone is passed
+↓
+Player 2 plays
 ```
 
-They are different concepts.
-
-Turn-based describes game flow.
-
-Pass & Play describes device interaction.
+Each game must explicitly define its local interaction model.
 
 ---
 
-# 8. Orientation and Screen Layout
+# 8. Game Layout Orientation vs Device Orientation
 
-Orientation must be determined by the individual game's requirements.
+## 8.1 Critical Rule
 
-Do not force every game into one global orientation.
+**Game layout orientation and device orientation are separate concerns.**
 
-A game may use:
+A game may have a:
 
-* Portrait
-* Landscape
-* Another appropriate layout strategy
+* Portrait-style layout
+* Landscape-style layout
+* Horizontal board
+* Vertical board
+
+without automatically changing the physical orientation of the device.
+
+### Example
+
+Four in a Row / Connect 4 may use a horizontal/landscape-style board:
+
+```text
+● ● ● ● ● ● ●
+● ● ● ● ● ● ●
+● ● ● ● ● ● ●
+● ● ● ● ● ● ●
+● ● ● ● ● ● ●
+● ● ● ● ● ● ●
+```
+
+But opening the game must NOT automatically rotate the phone to landscape.
+
+The device may remain:
+
+```text
+Portrait
+┌─────────┐
+│         │
+│  Game   │
+│  Board  │
+│         │
+└─────────┘
+```
+
+The game UI must adapt to the currently available screen dimensions.
+
+---
+
+## 8.2 No Game-Level Device Rotation
+
+Games must not normally use game-specific device orientation locking/forcing such as:
+
+```dart
+SystemChrome.setPreferredOrientations(...)
+```
+
+to force the physical device into landscape or portrait.
+
+Do not introduce device rotation logic merely because the game's visual layout is horizontal.
+
+The game should adapt its UI to the current device orientation.
+
+---
+
+## 8.3 No Orientation Leakage
+
+A game must never leave the rest of the application in a game-forced orientation.
+
+For example:
+
+```text
+Game Detail
+Portrait
+   ↓
+Connect 4
+Portrait device + horizontal game layout
+   ↓
+Game finishes
+   ↓
+Result
+Portrait
+   ↓
+Game Detail
+Portrait
+```
+
+Never:
+
+```text
+Game Detail
+Portrait
+   ↓
+Connect 4 forces Landscape
+   ↓
+Game finishes
+   ↓
+Game Detail remains Landscape ❌
+```
+
+Game completion, exiting, navigation, backgrounding, or returning to another screen must not cause orientation leakage.
+
+---
+
+## 8.4 Responsive Game Layout
+
+Removing orientation locking alone is not sufficient.
+
+If a game has a horizontal-style layout, its UI must still be responsive.
 
 Consider:
 
-* Number of players
+* Available width
+* Available height
+* Safe areas
+* Aspect ratio
 * Board dimensions
-* Player positioning
+* Player positions
 * Controls
-* Device aspect ratio
-* Shared-device interaction
-* Game visibility
 * Touch targets
+* Text readability
+* Turn indicators
+* Animations
 
-The game should use the most appropriate layout rather than assuming the application-wide default is always correct.
+Do not allow:
+
+* Cropping
+* Overflow
+* Unreachable controls
+* Tiny unreadable text
+* Overlapping player indicators
+* Broken board proportions
+
+---
+
+## 8.5 Orientation Is Game-Specific
+
+Each game may define its preferred **layout orientation**, but this must not automatically become a device orientation lock.
+
+For example:
+
+```text
+Four in a Row
+layoutOrientation = horizontal
+deviceOrientationLock = none
+```
+
+The existing game-specific orientation requirements must be preserved where appropriate, but physical device rotation should not be introduced unless there is an explicit product requirement.
 
 ---
 
 # 9. UI / UX Direction
 
-The application is primarily designed for kids and casual users.
+The product is primarily designed for kids and casual players.
 
-The UI should therefore be:
+UI should feel:
 
 * Colorful
 * Friendly
-* Cartoon-like
 * Playful
-* Easy to understand
-* Visually engaging
-* Touch-friendly
-* Responsive
+* Cartoon-like
+* Approachable
+* Clear
+* Fun
 
-Avoid making the application look like a dark competitive gaming dashboard.
+Avoid making the product feel like:
 
-Do not default to:
+* A dark competitive gaming dashboard
+* A corporate admin panel
+* A complex casino interface
+* A dense professional dashboard
 
-* Dark-only gaming UI
-* Excessive neon
-* Overly technical visuals
-* Dense information
-* Complicated navigation
-* Excessive gradients
-* Unnecessary visual effects
+Reference apps may be used only for general UX inspiration.
 
-Visual inspiration may be taken from the general feel of:
-
-**Two Player Games: The Challenge by JindoBlu**
-
-Do not directly copy copyrighted assets, branding, or proprietary designs.
-
-Use the reference only for general product direction such as:
-
-* Playfulness
-* Cartoon-style presentation
-* Friendly game cards
-* Simple navigation
-* Game-focused UI
-* Easy-to-understand interactions
+Do not directly copy another product's visual design.
 
 ---
 
 # 10. Design System
 
-Prefer reusable design primitives.
+Create reusable visual primitives where repetition exists.
 
 Examples:
 
-* App buttons
-* Game cards
-* Avatar widgets
-* Player cards
-* Dialogs
-* Bottom sheets
-* Loading indicators
-* Empty states
+* Buttons
+* Cards
+* Player identity components
+* Game headers
+* Turn indicators
+* Result screens
+* Game option menus
+* Loading states
 * Error states
-* Timer widgets
-* Game status indicators
-* Common text styles
-* Common spacing
-* Common shapes
+* Empty states
 
-Do not create slightly different versions of the same component without a real reason.
-
-However, avoid creating abstractions that make simple UI harder to understand.
-
-Reuse should improve consistency, not create unnecessary complexity.
+Reuse should improve consistency without forcing every game into the same visual layout.
 
 ---
 
 # 10.1 Universal Game Visual & Result Rules
 
-These are universal product-level rules for applicable two-player games.
+## 10.1.1 Standard Two-Player Identity
 
-Game-specific documentation may define exceptions when required by the game's player count, orientation, interaction model, or rules.
+For standard 2-player games:
 
-## 10.1.1 Player Identity
+```text
+Player 1 / Local User = Blue
+Player 2 / Opponent = Red
+```
 
-For standard two-player games:
+Use:
 
-* Player 1 / local user = Blue
-* Player 2 / opponent = Red
+```text
+Blue = #00ACF8
+Red  = #FF5E57
+```
 
-Standard player colors:
+Online:
 
-* Blue: `#00ACF8`
-* Red: `#FF5E57`
+```text
+Local User = Player 1 = Blue
+Opponent   = Player 2 = Red
+```
 
-Player identity must remain consistent throughout the game.
+Bot:
 
-### Online Games
+```text
+Local User = Blue
+Bot        = Red
+```
 
-The local user is always:
+Local 2-player:
 
-* Player 1
-* Blue
+```text
+Player 1 = Blue
+Player 2 = Red
+```
 
-The online opponent is always:
-
-* Player 2
-* Red
-
-Do not swap the user's color based on matchmaking order.
-
-### Bot Games
-
-The local user is always:
-
-* Player 1
-* Blue
-
-The bot is always:
-
-* Player 2
-* Red
-
-The bot must always use the Red player identity in the initial product implementation.
-
-### Local Two-Player Games
-
-For standard two-player local games:
-
-* Player 1 = Blue
-* Player 2 = Red
+Do not dynamically swap these identities merely because the turn changes.
 
 ---
 
-## 10.1.2 Shared-Device Player Positioning
+## 10.1.2 Fixed-Side Player Positioning
 
-For games where two players interact from opposite sides of the same device:
+For standard fixed-side shared-device 2-player games:
 
-### Portrait
+### Portrait layout
 
-* Blue / Player 1 = bottom
-* Red / Player 2 = top / front-camera side
+```text
+Red / Player 2
+      TOP
 
-### Landscape
+      GAME
 
-* Blue / Player 1 = left
-* Red / Player 2 = right / camera side
+Blue / Player 1
+     BOTTOM
+```
 
-These are default positioning rules for fixed-side shared-device games.
+### Landscape-style layout
 
----
+```text
+Blue / Player 1 | GAME | Red / Player 2
+```
 
-## 10.1.3 Pass & Play
-
-Pass-and-play is an exception to fixed-side positioning.
-
-If players physically pass the device:
-
-* Do not force Blue to always remain at the bottom/left.
-* Do not force Red to always remain at the top/right.
-* The game may define its own interaction layout.
-
-The underlying player identity must still remain:
-
-* Player 1 = Blue
-* Player 2 = Red
+However, this rule applies to the **game's logical/player layout**, not as an instruction to physically rotate the device.
 
 ---
 
-## 10.1.4 Turn Indicator
+# 10.1.3 Turn Indicator Is Required
 
-Every turn-based game must clearly communicate the active player.
-
-Do not rely only on background color.
-
-Prefer a reusable curved/semi-circular turn indicator where practical.
-
-Examples:
-
-* `BLUE TURN`
-* `RED TURN`
+Every turn-based game must clearly communicate whose turn it is.
 
 The indicator should:
 
-* Use the active player's color family.
-* Clearly identify the active player.
-* Update whenever the turn changes.
-* Remain readable against the game background.
-* Use appropriate contrast.
-* Prefer a short smooth transition when the active player changes.
-
-The turn indicator should remain useful even when the game has little or no background space.
-
----
-
-## 10.1.5 Turn Indicator Position
-
-For fixed-side shared-device games:
-
-### Portrait
-
-* Blue turn indicator = bottom
-* Red turn indicator = top
-
-### Landscape
-
-* Blue turn indicator = left
-* Red turn indicator = right
-
-For pass-and-play:
-
-* Bottom is the default position when practical.
-* Game-specific placement is allowed when required.
-
-The indicator must remain visually associated with the active player.
-
----
-
-## 10.1.6 Turn Background
-
-Where the game has sufficient surrounding background space:
-
-* Blue turn may use the Blue color family.
-* Red turn may use the Red color family.
-
-Background color is optional.
-
-Do not force full-screen games to change their entire background merely to communicate the turn.
-
-Full-screen games should use a dedicated turn indicator or another clear visual indicator.
-
-When the background and turn indicator use the same color family, use different shades/tints/contrast levels so they remain visually distinct.
-
----
-
-## 10.1.7 Turn Transition
-
-When the active player changes:
-
-* Update the turn indicator.
-* Update any turn-related background when used.
-* Prefer a short smooth transition instead of an abrupt visual jump when appropriate.
-
-Do not add unnecessary heavy animations.
-
----
-
-## 10.1.8 Gameplay Controls
-
-Do not use separate persistent Back and Restart buttons on the gameplay screen by default.
-
-Prefer one:
-
-* More
-* Options
-* Three-dot
-
-control.
-
-The menu may contain:
-
-1. Exit Game
-2. Restart
-3. Revert — only when supported by the current game/mode
-
-Do not show unsupported actions.
-
----
-
-## 10.1.9 Revert
-
-Revert is a game/mode capability, not a universal action.
-
-Only expose Revert when the current game and mode support undoing the previous valid move.
-
-For the initial product:
-
-* Play with Local may support Revert where appropriate.
-* Bot mode must not expose Revert unless explicitly supported.
-* Online modes must not expose local Revert unless explicitly supported by the online game architecture/server.
-
-When Revert is supported, it must restore:
-
-* Relevant game state
-* Previous valid move
-* Active player
-* Relevant turn information
-* Any other state affected by the reverted move
-
-Do not show Revert merely because a game is turn-based.
-
----
-
-## 10.1.10 Game End Conditions
-
-A game may end because of:
-
-* Game-specific win condition
-* Game-specific draw condition
-* Turn timeout
-* Explicit resignation
-* Other game-specific terminal conditions
-
-Leaving the game screen is NOT automatically resignation.
-
-Closing/minimizing the application is NOT automatically resignation unless a game-specific rule explicitly requires otherwise.
-
-A player may temporarily leave the game screen and return later.
-
-For online games, the server determines authoritative game-ending conditions.
-
----
-
-## 10.1.11 Game Result Screen
-
-When a game reaches a final result, show a dedicated Game Result screen/state before returning to the previous game flow.
-
-Do not immediately leave the finished game.
-
-The result must clearly identify the outcome.
-
-### Blue Player Wins
-
-Use the Blue color family:
-
-`#00ACF8`
-
-Clearly communicate:
-
-`BLUE PLAYER WIN`
-
-### Red Player Wins
-
-Use the Red color family:
-
-`#FF5E57`
-
-Clearly communicate:
-
-`RED PLAYER WIN`
-
-### Bot Wins
-
-The bot is always Red.
-
-When the bot wins, display:
-
-`BOT WIN`
-
-Use the Red color family.
-
-### Online Opponent Wins
-
-The online opponent is always Red.
-
-When the online opponent wins, display:
-
-`RED PLAYER WIN`
-
-Use the Red color family.
-
-### Draw
-
-Use a neutral result treatment.
-
-Do not identify Blue or Red as the winner when the result is a draw.
-
----
-
-## 10.1.12 Result Screen Actions
-
-The Game Result screen should provide:
-
-* `Play Again`
-* `Exit`
-
-### Play Again
-
-Play Again should:
-
-* Start the same game again.
-* Preserve the selected mode.
-* Preserve the opponent type where applicable.
-* Reset the previous game state.
-* Start a fresh game.
+* Be clearly visible
+* Use the active player's color family
+* Include readable text
+* Update immediately when the turn changes
+* Have a short smooth transition
+* Maintain sufficient contrast
+* Not rely on color alone
 
 Examples:
 
 ```text
-Local → Local
-Bot → Bot
-Online → Online rematch/new match flow
+BLUE TURN
+RED TURN
 ```
 
-### Exit
-
-Exit should:
-
-* Leave the finished game.
-* Return to the appropriate previous game flow.
-* Not restart the game.
-
-Do not create unnecessary duplicate navigation actions.
+or game-specific equivalent.
 
 ---
 
-## 10.1.13 Result Screen Countdown
+# 10.1.4 Turn Indicator Layout Must Follow Player Interaction Model
 
-The Game Result screen must have an automatic exit countdown.
+Do not use one universal physical placement rule for every game.
 
-Initial countdown:
+The indicator layout must represent how players actually interact with the device.
 
-`3 seconds`
+The reusable system should support different layouts.
+
+### Layout A — Side By Side
+
+Used for games where players are logically positioned on opposite sides of the game layout.
 
 Example:
 
 ```text
-Auto exit in 3
-Auto exit in 2
-Auto exit in 1
+┌──────────────────────────┐
+│                          │
+│ LEFT PLAYER      RIGHT   │
+│                  PLAYER  │
+│                          │
+│         GAME             │
+│                          │
+└──────────────────────────┘
 ```
 
-After the countdown reaches zero, perform the same navigation behavior as `Exit`.
+Rules:
 
-If the user selects:
+* Left player indicator → left side
+* Right player indicator → right side
+* Left-side text → left aligned
+* Right-side text → right aligned
+* Indicators must remain readable
+* Do not allow text to wrap unnecessarily
 
-* Play Again
-* Exit
-
-the countdown must be cancelled immediately.
-
-The countdown must:
-
-* Be reset for every new result.
-* Stop when the result screen is disposed.
-* Not continue running after navigation.
-* Not create timer leaks.
-* Not create duplicate timers.
+This applies to horizontal/side-by-side game arrangements.
 
 ---
 
-## 10.1.14 Winning Combination Highlight
+### Layout B — Pass & Play
 
-Games with a multi-piece/cell winning combination should clearly highlight the winning combination.
+Used when the phone is physically passed between players.
 
-The original game pieces should remain visible unless the game specifically requires otherwise.
+Example:
 
-For line-based games such as Four in a Row:
+```text
+        ┌──────────────┐
+        │              │
+        │     GAME     │
+        │              │
+        │              │
+        │  ─────────   │
+        │   BLUE TURN  │
+        └──────────────┘
+```
 
-* Keep winning discs/pieces in their normal appearance.
-* Do NOT replace winning pieces with stars or unrelated symbols.
-* Use an overlay/animation to highlight the winning combination.
-* The overlay should follow the exact winning pieces/cells.
-* A floating/animated white line may be used where appropriate.
-* The highlight must be visible long enough to clearly communicate the winning combination.
-* The highlight must not unnecessarily obscure the game pieces.
+Rules:
 
-The winning highlight is visual feedback only and must not modify the underlying game state.
-
----
-
-## 10.1.15 Multi-Player Games
-
-The fixed Blue/Red rules above apply to standard two-player games.
-
-Games supporting more than two players must define their own player-color and positioning system in their game-specific documentation.
-
-Do not force a multi-player game into the two-player Blue/Red layout.
-
-However, multi-player games should still maintain:
-
-* Stable player identity
-* Clear active-player indication
-* Clear result state
-* Consistent player representation
-* Game-specific documented rules
+* Use one active turn indicator.
+* Place it near the bottom center.
+* Use a curved/semi-circular visual shape where appropriate.
+* Text should be center aligned.
+* Do not anchor it to the left or right side merely because the player color is Blue or Red.
+* The indicator represents the current player, not a permanent screen side.
+* It must work regardless of whether the current player is Blue or Red.
 
 ---
 
-## 10.1.16 Accessibility
+### Layout C — Between Players
 
-Important game information must not be communicated through color alone.
+Used when two players use the phone/game from their respective positions while the device remains between them.
+
+Example:
+
+```text
+┌──────────────────────────┐
+│                          │
+│          GAME            │
+│                          │
+│                          │
+│  BLUE TURN     RED       │
+│                          │
+└──────────────────────────┘
+```
+
+Rules:
+
+* Provide two bottom-area player indicators.
+* Each indicator represents one player's physical interaction position.
+* Indicators should be positioned within the player's own bottom-area region.
+* They must not overlap.
+* Each indicator should have clear player identity.
+* Text should align naturally within its own curved/semi-circular shape.
+* The active player must be visually distinguishable.
+* Do not assume that Blue must always occupy the same physical position if the game defines another interaction arrangement.
+
+---
+
+# 10.1.5 Turn Indicator Shape and Sizing
+
+Curved/semi-circular/quarter-circle indicators may be used where they fit the game.
+
+The visual style should feel like part of the game UI rather than a generic rectangular notification.
+
+Important:
+
+**Compact does not mean tiny.**
+
+Reduce:
+
+* Unnecessary padding
+* Excessive empty curved space
+* Oversized containers
+* Unused margins
+
+But preserve:
+
+* Large readable text
+* Strong contrast
+* Comfortable touch/readability area
+* Clear player identity
+* Appropriate curved shape
+
+Do not solve excessive empty space by simply shrinking the text.
+
+Do not replace a required curved indicator with a generic pill/rectangle unless the game's design explicitly requires it.
+
+---
+
+# 10.1.6 Turn Indicator Configuration
+
+Turn indicator behavior should be reusable and preferably configuration-driven.
+
+Possible conceptual layouts:
+
+```text
+sideBySide
+passAndPlay
+betweenPlayers
+```
+
+Do not hardcode game-specific indicator positioning throughout widgets.
+
+Prefer:
+
+```text
+Game Definition
+      ↓
+Interaction Model
+      ↓
+Turn Indicator Layout
+      ↓
+Reusable Turn Indicator
+```
+
+Before creating a new field such as:
+
+```text
+turnIndicatorLayout
+```
+
+inspect the existing game metadata/model.
+
+If an equivalent field already exists, reuse or extend it.
+
+Do not create duplicate configuration systems.
+
+---
+
+# 10.1.7 Turn Background
+
+A turn-specific background treatment is optional.
+
+Do not force the entire screen to change background color on every turn.
+
+If a background treatment is used:
+
+* Maintain readability
+* Use the active player's color family
+* Preserve sufficient contrast
+* Avoid distracting animations
+
+---
+
+# 10.1.8 Turn Transition
+
+Turn transitions should be:
+
+* Short
+* Smooth
+* Predictable
+
+Avoid long animations that delay gameplay.
+
+---
+
+# 10.1.9 Gameplay Controls
+
+Do not permanently display unnecessary controls such as:
+
+* Back
+* Restart
+* Revert
+
+Prefer a compact:
+
+```text
+More / Options / 3-dot
+```
+
+menu.
+
+The exact available actions depend on game capability.
+
+Current universal order:
+
+1. Exit Game
+2. Restart
+3. Revert — only when supported
+
+Do not show Revert if the game does not support it.
+
+---
+
+# 10.1.10 Game End Conditions
+
+Games may end because of:
+
+* Win
+* Draw
+* Timeout
+* Resignation
+* Other game-specific conditions
+
+Leaving the screen or backgrounding the app must not automatically mean resignation unless the product explicitly defines that behavior.
+
+---
+
+# 10.1.11 Result State
+
+When a game ends, enter a dedicated result state before navigating away.
+
+Examples:
+
+```text
+BLUE PLAYER WIN
+RED PLAYER WIN
+BOT WIN
+DRAW
+```
+
+Blue result:
+
+```text
+Blue visual identity
+```
+
+Red result:
+
+```text
+Red visual identity
+```
+
+Draw:
+
+```text
+Neutral visual identity
+```
+
+The result screen should clearly communicate the outcome.
+
+---
+
+# 10.1.12 Result Actions
+
+Provide:
+
+```text
+Play Again
+Exit
+```
+
+Play Again should:
+
+* Preserve game mode
+* Preserve opponent where applicable
+* Reset game state
+* Start a fresh game
+* Avoid stale state from the previous match
+
+---
+
+# 10.1.13 Result Countdown
+
+If a result countdown is used:
+
+```text
+3
+2
+1
+```
+
+Rules:
+
+* Start a fresh countdown for every result.
+* Cancel countdown if the user selects an action.
+* Stop/dispose the timer correctly.
+* Never create duplicate timers.
+* Avoid timer leaks.
+
+---
+
+# 10.1.14 Winning Combination Highlight
+
+When highlighting a winning combination:
+
+* Preserve the original pieces.
+* Use overlay/highlight/animation.
+* Do not replace original game pieces with unrelated symbols.
+
+For Four in a Row, the original discs must remain visible.
+
+Do not replace winning discs with stars or unrelated objects.
+
+---
+
+# 10.1.15 Multi-Player Games
+
+Do not force the standard Blue/Red 2-player rules onto games with more than two players.
+
+Multi-player games may define:
+
+* Their own player colors
+* Their own player positions
+* Their own turn indicators
+* Their own result presentation
+
+These rules must be documented in the relevant game specification.
+
+---
+
+# 10.1.16 Accessibility
+
+Never communicate important game state using color alone.
 
 For example:
 
-* Blue/Red colors identify players.
-* Text such as `BLUE TURN` / `RED TURN` also identifies the active player.
-* Result screens clearly state the result in text.
+Bad:
 
-Color should reinforce information, not be the only source of information.
+```text
+Only blue = current turn
+```
+
+Better:
+
+```text
+BLUE TURN
+```
+
+Use:
+
+* Text
+* Icons where useful
+* Color
+* Shape
+* Position
+
+together where appropriate.
 
 ---
 
-# 11. Game Logic
+# 11. Game Logic Must Be Separate From UI
 
-Game logic must be separated from UI.
+Do not place core game rules directly inside presentation widgets.
 
-Game rules should ideally be represented through dedicated game logic/engine classes or modules.
+Prefer:
 
-The game engine should handle concepts such as:
+```text
+UI
+ ↓
+Game State
+ ↓
+Game Engine / Rules
+```
 
-* Current player
+The game engine should handle:
+
 * Valid moves
-* Board state
-* Game state
+* Turn changes
 * Win detection
 * Draw detection
-* Turn switching
 * Game completion
-* Player elimination where applicable
-* Game-specific rules
-* Revert/undo state where supported
-* Result state where applicable
+* Reset
+* Serialization where required
 
-Flutter widgets should primarily:
-
-* Display state
-* Receive user interaction
-* Trigger actions
-* Render updated state
-
-Do not put complex rule calculations directly inside build methods.
+UI should display state rather than own the core rules.
 
 ---
 
 # 12. Game-Specific Documentation
 
-Universal rules belong in this file.
-
-Game-specific rules should be documented separately.
-
-Preferred structure:
-
-```text
-docs/
-└── games/
-    ├── tic_tac_toe.md
-    ├── four_in_a_row.md
-    ├── ludo.md
-    └── carrom.md
-```
-
-Each game document may describe:
-
-* Rules
-* Board structure
-* Player count
-* Modes
-* Turn rules
-* Win conditions
-* Draw conditions
-* Timer behavior
-* Offline interaction
-* Online synchronization
-* Bot behavior
-* Game-specific edge cases
-* Exact game-specific visual behavior
-* Game-specific exceptions to universal rules
-
-Do not make `AGENTS.md` unnecessarily large by placing detailed rules for every individual game here.
-
-Universal rules such as standard player identity, player colors, common turn indication, common gameplay controls, and common result-screen behavior belong in `AGENTS.md`.
-
-If a game intentionally differs from a universal rule, the exception must be explicitly documented in that game's documentation.
-
----
-
-# 13. Online Multiplayer
-
-Online game state must be authoritative on the server.
-
-The client must not be trusted to determine authoritative game outcomes.
-
-The server should validate:
-
-* Player identity
-* Game session
-* Player membership
-* Current turn
-* Move validity
-* Timer/deadline
-* Game status
-* Resignation
-* Win/loss/draw
-* Allowed actions
-
-The client should primarily:
-
-* Render state
-* Send user actions
-* Display timers
-* Display results
-* Recover/synchronize after reconnect
-
-Never rely on the client alone for:
-
-* Winner determination
-* Turn expiration
-* Valid move validation
-* Rating changes
-* Final game results
-
-For standard two-player online games:
-
-* Local user = Player 1 / Blue
-* Online opponent = Player 2 / Red
-
-The server/session model must preserve these player roles consistently.
-
----
-
-# 14. Socket.IO Architecture
-
-Socket.IO is used for real-time communication.
-
-Avoid unnecessary polling when Socket.IO can provide the required real-time behavior.
-
-Prefer event-driven communication.
-
-Examples of possible events:
-
-```text
-matchmaking:join
-matchmaking:matched
-game:join
-game:state
-game:move
-game:turn
-game:timer
-game:ended
-game:resign
-chat:message
-chat:cleared
-game:reconnect
-game:sync
-```
-
-Actual event names may differ.
-
-Do not create events unnecessarily.
-
-Each event should have a clear responsibility.
-
-Keep payloads small and intentional.
-
-Game result events/state should clearly communicate the authoritative final result to both clients.
-
----
-
-# 15. Socket Connection Discipline
-
-Avoid:
-
-* Multiple socket connections for the same user/session
-* Duplicate event listeners
-* Listeners registered repeatedly during rebuilds
-* Unremoved listeners
-* Unnecessary reconnect loops
-* Unnecessary socket traffic
-
-Always clean up:
-
-* Event listeners
-* Streams
-* Timers
-* Controllers
-* Subscriptions
-* Socket listeners
-* Other resources with lifecycle ownership
-
-A widget rebuild must not accidentally create another socket listener.
-
----
-
-# 16. Game Session / Room
-
-"Room" is primarily an internal backend/session concept.
-
-It does not necessarily mean the user must see a "Create Room" UI.
-
-A game session should identify:
-
-* Game
-* Players
-* Player roles
-* Current state
-* Current turn
-* Turn deadline
-* Game status
-* Created time
-* Relevant configuration
-
-For standard two-player sessions:
-
-* Local user should be represented as Player 1 / Blue.
-* Opponent should be represented as Player 2 / Red.
-
-The server owns the authoritative session state.
-
-Do not persist temporary session information in MongoDB unless there is a real product requirement.
-
----
-
-# 17. Random Online Matchmaking
-
-Random online flow:
-
-```text
-Play Online
-    ↓
-Find Opponent
-    ↓
-Matched
-    ↓
-Game Session
-    ↓
-Game
-```
-
-The matchmaking system should:
-
-* Avoid matching a user with themselves
-* Prevent duplicate active matchmaking entries
-* Remove users when matched
-* Handle disconnects
-* Handle cancellation
-* Handle stale matchmaking entries
-* Create the appropriate game session
-
-Do not unnecessarily persist matchmaking state in MongoDB.
-
-In-memory/server-managed state should be preferred for temporary matchmaking state when appropriate.
-
-For standard two-player games, the local user should become Player 1 / Blue and the matched opponent should become Player 2 / Red.
-
----
-
-# 18. Friend System
-
-Users can:
-
-* Send friend requests
-* Accept friend requests
-* Reject friend requests
-* View friends
-* Send game requests to friends
-
-Persistent friendship data belongs in MongoDB.
-
-Do not store temporary game chat as friendship data.
-
----
-
-# 19. Friend Game Requests
-
-A friend can send a game request containing:
-
-* Game
-* Player configuration if required
-* Turn duration where supported
-
-Flow:
-
-```text
-Friend
-  ↓
-Game Request
-  ↓
-Accept
-  ↓
-Game Session
-  ↓
-Game + Temporary Chat
-```
-
-The requested turn duration must be shared by both players.
-
-For standard two-player friend games:
-
-* Requesting/local user = Player 1 / Blue
-* Friend/opponent = Player 2 / Red
-
-The game request must not silently swap player identity.
-
----
-
-# 20. Turn Timer
-
-Online games may use a per-turn timer.
-
-Example:
-
-```text
-Player 1 → 1 hour
-
-Player 2 → 1 hour
-
-Player 1 → 1 hour
-
-Player 2 → 1 hour
-```
-
-The timer is per turn, not necessarily the total game duration.
-
-For friend games, the requesting player may choose a custom duration where supported.
-
-Random online games use predefined/default durations.
-
-The server must store/track the authoritative turn deadline.
-
-The client timer is only a visual representation.
-
-The client must never be trusted to decide:
-
-> "My timer reached zero, therefore I won."
-
-The server determines expiration.
-
-When the active player changes, the client should update the common turn indicator accordingly.
-
----
-
-# 21. Game End Conditions
-
-A game may end because of:
-
-1. Game-specific win condition
-2. Game-specific draw condition
-3. Turn timeout
-4. Explicit resignation
-5. Other game-specific terminal conditions
-
-Leaving the game screen is NOT automatically resignation.
-
-Closing/minimizing the application is NOT automatically resignation.
-
-A player may temporarily leave the game screen and return later.
-
-If the player is still within the active turn deadline, the game continues.
-
-For online games, the server determines authoritative game-ending conditions.
-
-After a game reaches a terminal result, the game should transition into its Game Result state/screen.
-
-The result state should clearly identify:
-
-* Winner
-* Loss
-* Draw
-* Timeout
-* Resignation
-* Other game-specific terminal result
-
-The result screen must not be confused with simply leaving the game screen.
-
----
-
-# 22. Backgrounding and Reconnection
-
-When a user:
-
-* Minimizes the app
-* Switches apps
-* Leaves the game screen temporarily
-* Loses network connection
-* Reopens the app
-
-the game should not automatically end unless game rules explicitly require it.
-
-The server continues the game timer.
-
-When the client reconnects:
-
-1. Authenticate/re-establish session.
-2. Identify active game.
-3. Request/synchronize current game state.
-4. Receive authoritative state.
-5. Recalculate/display remaining time based on server deadline.
-6. Resume UI.
-
-Never reset the timer merely because the client reconnects.
-
-Never trust stale client state over server state.
-
-If the game had already ended while the client was disconnected, the client must display the authoritative final result state rather than incorrectly resuming the game.
-
----
-
-# 23. Temporary In-Game Chat
-
-Online games support temporary chat.
-
-Chat exists only while the game session is active.
-
-Chat is available for:
-
-* Random online games
-* Friend games
-
-Chat is NOT available in offline mode.
-
-Chat must NOT be permanently stored in MongoDB unless a future product decision explicitly changes this requirement.
-
-Preferred architecture:
-
-```text
-Player A
-   ↓
-Socket.IO
-   ↓
-Active Game Session
-   ↓
-Socket.IO
-   ↓
-Player B
-```
-
-Messages should remain in active memory/session state only when necessary.
-
-When the game ends:
-
-* Chat must be cleared
-* Temporary chat state must be destroyed
-* Clients should no longer be able to send/receive game chat
-* No unnecessary database write should occur
-
-Do not store chat merely for convenience.
-
-The goal is to keep MongoDB Atlas usage low.
-
----
-
-# 24. Persistent Data
-
-MongoDB should primarily contain long-lived product data.
-
-Potential persistent data includes:
-
-* User
-* Profile
-* Authentication-related data
-* Friends
-* Friend requests
-* Wins
-* Losses
-* Games played
-* Rating
-* Other required persistent statistics
-
-Avoid persisting temporary data unnecessarily.
-
-Temporary data should generally remain outside MongoDB when possible:
-
-* Active game state
-* Temporary chat
-* Matchmaking queue
-* Socket session
-* Current turn timer state
-* Temporary connection state
-
-Do not introduce unnecessary collections.
-
----
-
-# 25. Leaderboard
-
-There is currently NO leaderboard requirement.
-
-Do not introduce:
-
-* Leaderboard collection
-* Global rankings
-* Ranking history
-* Leaderboard APIs
-* Leaderboard UI
-
-unless explicitly requested later.
-
-Profile rating is separate from a leaderboard.
-
----
-
-# 26. User Profile
-
-The profile may contain:
-
-* Username
-* Avatar
-* Wins
-* Losses
-* Games played
-* Rating
-
-Do not add unnecessary profile fields unless required.
-
-Statistics should be updated from authoritative game results.
-
-Clients must not be allowed to arbitrarily modify:
-
-* Wins
-* Losses
-* Rating
-* Games played
-
----
-
-# 27. Authentication
-
-Authentication may eventually support:
-
-* Email
-* Phone
-* Guest
-
-The exact verification mechanism is not fixed unless explicitly documented elsewhere.
-
-Do not assume a verification strategy without a product requirement.
-
-Authentication must be designed so additional login methods can be introduced later without rewriting the entire application.
-
-Never trust client-provided user identity.
-
----
-
-# 28. Bot
-
-The application currently requires one simple bot implementation.
-
-Do NOT create:
-
-* Easy bot
-* Medium bot
-* Hard bot
-
-as separate versions unless explicitly requested.
-
-The initial bot should be simple and maintainable.
-
-However, the architecture should avoid making future bot improvements unnecessarily difficult.
-
-Bot logic must remain separate from UI.
-
-For standard two-player games:
-
-* Local user = Player 1 / Blue
-* Bot = Player 2 / Red
-
-The bot must use the Red player identity.
-
-When the bot wins, the Game Result state should identify the result as:
-
-`BOT WIN`
-
-and use the Red color family.
-
----
-
-# 29. Flutter Architecture
-
-Use Flutter idiomatically.
-
-Prefer clear separation between:
-
-* UI
-* State
-* Models
-* Services
-* Repositories where useful
-* Game engines
-* Networking
-* Socket handling
-
-Do not introduce a state-management library merely because it is popular.
-
-If an existing project pattern is already established, follow it unless there is a strong technical reason to change it.
-
-Avoid putting business logic inside widgets.
-
-Game result state and turn state should be represented in the appropriate presentation/state layer rather than being hardcoded inside visual widgets.
-
----
-
-# 30. Flutter Performance
-
-Performance is important.
-
-Pay attention to:
-
-* Unnecessary widget rebuilds
-* Large widget trees
-* Unnecessary state updates
-* Expensive calculations during build
-* Large images
-* Unoptimized assets
-* Memory leaks
-* Controllers not disposed
-* Streams not cancelled
-* Timers not cancelled
-* Socket listeners not removed
-* Excessive animations
-* Unnecessary network requests
-
-Prefer efficient rendering patterns.
-
-Do not prematurely optimize every line.
-
-Optimize measurable or clearly expensive paths.
-
----
-
-# 31. Rebuild Discipline
-
-Do not cause the entire screen/application to rebuild when only a small section needs updating.
-
-Prefer appropriately scoped state.
-
-Examples:
-
-* Timer updates should not unnecessarily rebuild the entire game screen.
-* Chat messages should not rebuild unrelated UI.
-* One player's state change should not unnecessarily rebuild unrelated widgets.
-* Animation state should remain localized when possible.
-* Turn indicator updates should not rebuild unrelated game UI.
-* Result countdown updates should not unnecessarily rebuild the entire application.
-
-However, do not create excessive micro-state abstractions solely to avoid a rebuild.
-
-Balance performance with maintainability.
-
----
-
-# 32. App Size and Dependencies
-
-Keep the application lightweight.
-
-Before adding a dependency, ask:
-
-1. Is it actually required?
-2. Can Flutter/Dart already solve this?
-3. Is there already an existing package solving the same problem?
-4. Does the dependency significantly increase app size?
-5. Does it introduce unnecessary native/platform complexity?
-6. Will it be maintained?
-7. Is it appropriate for the project?
-
-Avoid dependency duplication.
-
-Do not add libraries merely because they are fashionable.
-
-Prefer a smaller dependency graph when functionality is equivalent.
-
----
-
-# 33. DRY and Reusability
-
-Follow DRY principles, but do not force everything into one abstraction.
-
-Good candidates for reuse:
-
-* API client
-* Socket client
-* Buttons
-* Cards
-* Avatar
-* Timer
-* Dialogs
-* Game metadata
-* Validation
-* Error handling
-* Common networking utilities
-* Turn indicators
-* Game result UI/state components
-* Game control/options menus
-* Player identity/status indicators
-
-Shared game components should be reusable when their behavior is genuinely common.
-
-Examples:
-
-* A reusable Turn Indicator can provide common turn presentation.
-* A reusable Game Result component/state can provide common result behavior.
-* A reusable Game Options menu can provide common controls.
-* A reusable player indicator can maintain consistent player identity presentation.
-
-However, do not force every game into the same visual layout.
-
-Games may have different:
-
-* Player counts
-* Orientations
-* Interaction models
-* Board structures
-* Result presentation
-* Game rules
-
-Avoid:
-
-* Giant universal components
-* Components with dozens of unrelated parameters
-* Generic abstractions that hide simple logic
-* Premature framework-like systems
-
-Rule:
-
-> Reuse when behavior is genuinely shared. Keep code local when abstraction would make the code harder to understand.
-
-Reuse should improve consistency without preventing legitimate game-specific behavior.
-
----
-
-# 34. Backend Architecture
-
-Node.js/Express backend should use clear separation of responsibilities.
-
-Prefer conceptual layers such as:
-
-```text
-Routes
-  ↓
-Controllers
-  ↓
-Services
-  ↓
-Repositories / Database
-```
-
-Real-time Socket.IO handling should have its own organized structure.
-
-Avoid placing all backend logic inside one server file.
-
-Keep:
-
-* HTTP APIs
-* Socket events
-* Game logic
-* Database logic
-* Authentication
-* Validation
-
-appropriately separated.
-
----
-
-# 35. Backend Game Authority
-
-For online games, the backend must be authoritative.
-
-The server should validate every important game action.
-
-For example:
-
-```text
-Client:
-
-"I want to move here."
-
-Server:
-
-"Is this player allowed to move?"
-
-"Is it their turn?"
-
-"Is the game still active?"
-
-"Is the move valid?"
-
-"Has the timer expired?"
-
-If valid:
-
-    Apply move
-
-    Update state
-
-    Determine result
-
-    Broadcast state
-```
-
-Do not accept a client-provided winner as truth.
-
-Do not accept a client-provided rating change as truth.
-
-Do not accept arbitrary game state from the client.
-
-The server must also determine the authoritative final result.
-
----
-
-# 36. Validation
-
-Validate input at the server.
-
-Validate:
-
-* Authentication
-* IDs
-* Game IDs
-* Player membership
-* Move payloads
-* Game configuration
-* Timer values
-* Friend requests
-* Game requests
-* Chat payloads
-* Socket events
-
-Never rely exclusively on Flutter-side validation.
-
-Client validation is for UX.
-
-Server validation is for security and correctness.
-
----
-
-# 37. Security
-
-Never trust the client.
-
-Protect:
-
-* Authentication
-* Authorization
-* User identity
-* Game actions
-* Friend actions
-* Game requests
-* Statistics
-* Rating
-* Socket events
-
-Avoid exposing secrets in the Flutter application.
-
-Do not commit:
-
-* API secrets
-* Database credentials
-* Private keys
-* Production tokens
-* Sensitive environment variables
-
-Use environment configuration appropriately.
-
----
-
-# 38. MongoDB Atlas Discipline
-
-MongoDB Atlas free-tier usage should be treated as a limited resource.
-
-Avoid unnecessary writes.
-
-Do not write temporary chat messages.
-
-Do not repeatedly save transient game state unless required.
-
-Do not create unnecessary indexes or collections.
-
-Avoid excessive polling.
-
-Prefer event-driven updates.
-
-Batch or combine writes where appropriate.
-
-Only persist information that has actual product value.
-
----
-
-# 39. Network Efficiency
-
-Minimize unnecessary network traffic.
-
-Prefer:
-
-* Small payloads
-* Event-driven updates
-* Server-side authoritative state
-* Socket.IO for real-time game communication
-* Cached data where appropriate
-* Appropriate API request frequency
-
-Avoid:
-
-* Repeated identical API requests
-* Polling when sockets are sufficient
-* Sending entire large game states when a smaller update is sufficient
-* Duplicate requests caused by rebuilds
-* Duplicate socket events
-
-Do not optimize payload size so aggressively that the architecture becomes difficult to maintain.
-
----
-
-# 40. Loading / Error / Empty States
-
-Every network-dependent feature should consider:
-
-* Loading
-* Success
-* Empty
-* Error
-* Retry
-* Offline/disconnected
-* Reconnecting
-
-Do not leave the UI in an unexplained blank state.
-
-Errors should be understandable to users.
-
-Developer details should be logged appropriately rather than exposed directly to users.
-
----
-
-# 41. Game Lifecycle
-
-Every online game should conceptually support:
-
-```text
-Waiting / Matchmaking
-        ↓
-Matched
-        ↓
-Session Created
-        ↓
-Game Active
-        ↓
-Turn
-        ↓
-Move
-        ↓
-Next Turn
-        ↓
-Win / Loss / Draw / Timeout / Resign
-        ↓
-Game End
-        ↓
-Game Result State / Screen
-        ↓
-Play Again OR Exit
-        ↓
-Appropriate Game Flow
-```
-
-The exact lifecycle may differ by game.
-
-Game-specific requirements should be documented in:
+Maintain game-specific documentation under:
 
 ```text
 docs/games/
 ```
 
-The result screen/state should be shown after a terminal result and before the user leaves the finished game.
-
-The exact ordering of backend cleanup, temporary chat destruction, statistics updates, and client navigation may vary according to architecture.
-
----
-
-# 42. State Synchronization
-
-The client must be able to reconstruct the current game state from the server.
-
-Do not depend on receiving every historical event.
-
-A reconnecting player should be able to request a current authoritative snapshot.
-
-A synchronization response should contain enough information to restore the necessary UI state.
-
-If the server reports that the game has already ended, the client must restore the final result state rather than incorrectly showing an active game.
-
----
-
-# 43. Idempotency and Duplicate Actions
-
-Network conditions may cause duplicate actions/events.
-
-Important operations should be designed to avoid accidental duplicate effects.
-
 Examples:
 
-* Resign
-* Move
-* Friend request
-* Game request
-* Matchmaking join
-* Restart/rematch requests where applicable
+```text
+docs/games/tic_tac_toe.md
+docs/games/four_in_a_row.md
+docs/games/ludo.md
+docs/games/carrom.md
+```
 
-Where appropriate, use:
+Game-specific exceptions should be documented there.
 
-* Server-side validation
-* Unique action/request IDs
-* State checks
-* Idempotent operations
-
-Do not assume the network delivers exactly one copy of every event.
+Do not add game-specific exceptions to universal rules unless they truly apply platform-wide.
 
 ---
 
-# 44. Timers and Time
+# 13. Online Multiplayer
 
-Never rely solely on client clocks for authoritative timing.
+Online games must support:
 
-For online games:
-
-```text
-Server:
-
-turnStartedAt
-turnDeadline
-```
-
-The client derives:
-
-```text
-remainingTime = turnDeadline - currentTime
-```
-
-The server decides whether the turn has actually expired.
-
-Account for:
-
-* Network latency
+* Matchmaking
+* Room/session creation
+* Joining
+* Leaving
+* Turn synchronization
+* State synchronization
 * Reconnection
-* Backgrounding
-* Client clock differences
+* Error handling
+* Game completion
 
-Do not reset the timer when the app reconnects.
-
-Do not treat the client-side countdown reaching zero as authoritative.
-
-The same lifecycle principle applies to result-screen countdowns: they are UI timers, must be cancelled when no longer needed, and must not leak resources.
+Do not rely only on local UI state for authoritative multiplayer behavior.
 
 ---
 
-# 45. Resource Lifecycle
+# 14. Socket.IO
 
-Every resource with a lifecycle must have an owner and cleanup path.
+Use Socket.IO for real-time communication.
+
+Socket events should be:
+
+* Clearly named
+* Documented
+* Validated
+* Idempotent where necessary
+
+Do not create duplicate socket listeners.
+
+Always clean up listeners when screens/services are disposed.
+
+---
+
+# 15. Game Session / Room
+
+Each online game should have a clear session/room identity.
+
+A session should contain enough information to restore or synchronize the game.
+
+Avoid storing unnecessary data in the room.
+
+---
+
+# 16. Matchmaking
+
+Matchmaking should be isolated from individual game logic.
+
+The game should specify:
+
+* Game ID
+* Player count
+* Mode
+* Required capabilities
+
+Matchmaking should handle the discovery of compatible players.
+
+---
+
+# 17. Friends
+
+Friend functionality is platform-wide.
+
+Do not implement separate friend systems for individual games.
+
+---
+
+# 18. Friend Game Requests
+
+Friend game requests should be reusable across supported games.
+
+A request should contain enough information to identify:
+
+* Sender
+* Receiver
+* Game
+* Mode
+* Session/request state
+
+---
+
+# 19. Turn Timer
+
+Turn timers should be reusable.
+
+The server should remain authoritative for online timers.
+
+Client timers are primarily for display.
+
+Do not trust the client for authoritative timeout decisions.
+
+---
+
+# 20. Game End
+
+Online game completion must be validated by the server.
+
+The client should not be able to arbitrarily claim:
+
+```text
+I won
+```
+
+Server-side validation must determine valid game outcomes.
+
+---
+
+# 21. Background / Reconnection
+
+Backgrounding the application should not automatically destroy a valid game session.
+
+Handle:
+
+* App lifecycle
+* Temporary disconnect
+* Reconnection
+* State resynchronization
+* Session expiration
+
+Avoid creating duplicate game sessions after reconnecting.
+
+---
+
+# 22. Temporary Chat
+
+Online players may have temporary game chat.
+
+Chat should be associated with the active game/session.
+
+Temporary chat should not automatically become permanent friendship/profile data.
+
+Use Socket.IO for real-time delivery where appropriate.
+
+---
+
+# 23. Persistent Data
+
+Persist only data that actually needs persistence.
 
 Examples:
 
-* AnimationController
-* TextEditingController
-* ScrollController
-* Timer
-* StreamSubscription
-* Socket listener
-* FocusNode
-* ChangeNotifier
-* WebSocket/Socket connection
+* User
+* Profile
+* Friends
+* Game history where required
+* Persistent statistics where required
 
-If something is created during a lifecycle, determine when it must be disposed.
+Do not store transient gameplay state permanently unless required.
+
+---
+
+# 24. Leaderboard
+
+A leaderboard is **not currently required**.
+
+Do not build leaderboard infrastructure unless explicitly requested.
+
+---
+
+# 25. Profile
+
+Profile functionality should be platform-wide.
+
+Avoid game-specific profile implementations.
+
+---
+
+# 26. Authentication
+
+Authentication must be handled centrally.
+
+Do not implement separate authentication logic inside individual games.
+
+Use secure authentication/session practices.
+
+---
+
+# 27. Bot
+
+Bots should remain simple initially.
+
+Architecture should allow future improvement without requiring a complete rewrite.
+
+Do not over-engineer AI before actual product requirements exist.
+
+---
+
+# 28. Flutter Architecture
+
+Prefer a clear separation between:
+
+* Screens
+* Widgets
+* State
+* Models
+* Services
+* Game engines
+* Networking
+
+Do not place large amounts of business logic inside UI widgets.
+
+Use reusable components where appropriate.
+
+---
+
+# 29. Performance
+
+Prioritize:
+
+1. Smooth gameplay
+2. Fast screen transitions
+3. Efficient network usage
+4. Efficient rendering
+5. Reasonable memory usage
+6. Minimal unnecessary rebuilds
+
+Do not claim performance improvements without measurement.
+
+---
+
+# 30. Rebuild Discipline
+
+Avoid unnecessary rebuilds.
+
+Before calling:
+
+```text
+setState
+notifyListeners
+emit
+state update
+```
+
+consider whether the entire widget tree actually needs to rebuild.
+
+Use targeted state updates where practical.
+
+---
+
+# 31. Dependencies
+
+Do not add a package just because it is convenient.
+
+Before adding a dependency:
+
+1. Check whether Flutter/Dart already provides the capability.
+2. Check whether an existing project dependency already solves it.
+3. Consider maintenance and bundle size.
+4. Add the dependency only when justified.
+
+---
+
+# 32. DRY / Reuse
+
+Reuse platform-wide behavior.
+
+Examples:
+
+* Turn indicators
+* Result UI
+* Game controls
+* Player identity
+* Loading
+* Error states
+* Network handling
+* Socket lifecycle
+* Timer lifecycle
+
+However:
+
+**Do not force every game into the exact same visual layout.**
+
+Reuse behavior and components where appropriate while allowing game-specific presentation.
+
+---
+
+# 33. Backend Architecture
+
+Backend should maintain clear layers such as:
+
+```text
+Routes
+ ↓
+Controllers
+ ↓
+Services
+ ↓
+Game / Domain Logic
+ ↓
+Database
+```
+
+Do not put all business logic inside route handlers.
+
+---
+
+# 34. Backend Authority
+
+For online games, the backend/server is authoritative for:
+
+* Valid moves
+* Turn ownership
+* Game outcome
+* Timer expiration
+* Session state
+* Player membership
+
+Never trust arbitrary client-provided game results.
+
+---
+
+# 35. Validation
+
+Validate data at boundaries.
+
+Validate:
+
+* Request payloads
+* Socket payloads
+* Player identity
+* Session membership
+* Game state
+* Move legality
+
+Never assume the client is trustworthy.
+
+---
+
+# 36. Security
+
+Protect:
+
+* Authentication
+* Authorization
+* Socket events
+* Game sessions
+* API endpoints
+* User data
+
+Do not expose sensitive information unnecessarily.
+
+---
+
+# 37. MongoDB Atlas
+
+Keep database operations efficient.
+
+Avoid:
+
+* Unnecessary queries
+* Duplicate queries
+* Loading large datasets unnecessarily
+* Missing indexes for frequently queried fields
+
+Add indexes based on actual query patterns.
+
+---
+
+# 38. Network Efficiency
+
+Avoid sending unnecessary real-time events.
+
+Prefer sending only the state/data required for synchronization.
+
+Do not repeatedly send unchanged data.
+
+---
+
+# 39. Loading / Error / Empty States
+
+Every network-dependent screen should have appropriate:
+
+* Loading state
+* Error state
+* Empty state
+* Retry behavior where appropriate
+
+Do not leave users with blank screens.
+
+---
+
+# 40. Game Lifecycle
+
+Every game should have a clear lifecycle:
+
+```text
+Initialize
+ ↓
+Ready
+ ↓
+Playing
+ ↓
+Paused / Backgrounded if applicable
+ ↓
+Finished
+ ↓
+Result
+ ↓
+Exit / Play Again
+```
+
+Resources must be cleaned up when the lifecycle ends.
+
+---
+
+# 41. State Synchronization
+
+For online games, state synchronization must be deterministic.
+
+Avoid:
+
+```text
+Client A thinks one thing
+Client B thinks another thing
+Server thinks something else
+```
+
+Use server authority and predictable state transitions.
+
+---
+
+# 42. Idempotency
+
+Important actions should be safe against duplicate requests/events where applicable.
+
+Examples:
+
+* Join room
+* Leave room
+* Submit move
+* Restart
+* End game
+* Reconnect
+
+Do not allow duplicate socket events to create duplicate state transitions.
+
+---
+
+# 43. Timers
+
+Every timer must have:
+
+* Clear ownership
+* Start condition
+* Stop condition
+* Disposal logic
+
+Never leave timers running after their screen/game lifecycle ends.
+
+---
+
+# 44. Lifecycle Resources
+
+Dispose:
+
+* Timers
+* Animation controllers
+* Stream subscriptions
+* Socket listeners
+* Text controllers
+* Focus nodes
+* Other disposable resources
 
 Avoid memory leaks.
 
 ---
 
-# 46. Assets
+# 45. Assets
 
-Optimize:
+Game assets should be:
 
-* Image dimensions
-* Image formats
-* Unused assets
-* Duplicate assets
-* Font files
-* Animation files
+* Appropriately sized
+* Optimized
+* Organized
+* Reusable where possible
 
-Do not include large assets when a smaller equivalent is sufficient.
-
-Do not add multiple fonts unnecessarily.
-
-Prefer a consistent visual identity.
+Do not add huge assets unnecessarily.
 
 ---
 
-# 47. Animation
+# 46. Animation
 
-Animations should improve UX rather than merely consume resources.
+Animations should improve clarity and feedback.
 
-Prefer:
+Avoid excessive animation that:
 
-* Short
-* Smooth
-* Purposeful
-* Lightweight
-
-Avoid excessive animation.
-
-Avoid continuously running animations when they are not visible or required.
-
-Pause/dispose expensive animation resources appropriately.
-
-Game-result and winning-combination animations should remain understandable and should not obscure important game information.
+* Delays interaction
+* Causes frame drops
+* Distracts from gameplay
+* Makes UI difficult to understand
 
 ---
 
-# 48. Testing
+# 47. Testing
 
-Important game logic should be testable independently of Flutter UI.
+Test:
 
-Prioritize tests for:
-
-* Win detection
-* Draw detection
-* Valid/invalid moves
+* Game rules
+* Win conditions
+* Draw conditions
 * Turn switching
+* Restart
+* Exit
+* Revert where supported
+* Timers
+* Socket events
+* Reconnection
+* Result state
+* UI edge cases
+
+For orientation/layout-sensitive games, test different device sizes and orientations.
+
+---
+
+# 48. Edge Cases
+
+Consider:
+
+* Rapid taps
+* Double actions
+* Network loss
+* Reconnection
+* App backgrounding
+* App resume
+* Player leaving
+* Invalid moves
+* Duplicate events
 * Timer expiration
-* Resignation
-* Reconnection state
-* Player validation
-* Matchmaking edge cases
-* Game lifecycle
-* Bot decisions
-* Server-side validation
-* Revert behavior where supported
-* Result-state behavior
-
-Do not rely only on manually clicking through the UI.
+* Restart during animation
+* Exit during game
+* Result countdown interruption
 
 ---
 
-# 49. Edge Cases
+# 49. Logging
 
-Always consider:
+Logs should help diagnose:
 
-* User disconnects during turn
-* User reconnects after several seconds/minutes
-* User opens the game from another screen
-* Both clients reconnect
-* Player resigns twice
-* Duplicate move arrives
-* Move arrives after timeout
-* Move arrives after game ended
-* Friend request already exists
-* Game request already accepted
-* Matchmaking user disconnects
-* Game session becomes stale
-* Socket reconnects multiple times
-* App goes into background
-* App is killed
-* Network changes between Wi-Fi/mobile data
-* Server restarts
-* Revert requested when no valid previous move exists
-* Result countdown is already running
-* User selects Play Again during result countdown
-* User selects Exit during result countdown
-* Duplicate result events arrive
-* Result screen is opened after reconnect
-* Game ends while the client is disconnected
-
-Do not assume the happy path is the only path.
-
----
-
-# 50. Logging and Debugging
-
-Use useful structured logging during development.
-
-Logs should help identify:
-
-* User/session
-* Game
-* Socket event
-* Error
-* State transition
-* Request failure
-
-Do not log sensitive information such as:
-
-* Passwords
-* Tokens
-* Secrets
-* Private credentials
+* Socket problems
+* API problems
+* Session problems
+* Game state problems
+* Unexpected lifecycle transitions
 
 Avoid excessive production logging.
 
+Never log sensitive information.
+
 ---
 
-# 51. Error Handling
+# 50. Error Handling
 
-Errors should be handled at the appropriate layer.
+Errors should be:
 
-Do not silently swallow errors.
+* Predictable
+* User-friendly
+* Recoverable where possible
 
-Do not expose raw stack traces to users.
+Do not expose raw backend/internal errors directly to users.
 
-Prefer:
+---
+
+# 51. Git / Change Discipline
+
+Keep changes focused.
+
+Avoid mixing:
 
 ```text
-Low-level error
-      ↓
-Handled/translated
-      ↓
-User-friendly message
+Feature change
++
+Unrelated refactor
++
+Formatting entire project
++
+Dependency upgrades
 ```
 
-Keep technical logging separate from user-facing messages.
+unless explicitly required.
+
+Prefer small, reviewable changes.
 
 ---
 
-# 52. Git and Change Discipline
+# 52. AI Agent Behavior
 
-Make focused changes.
+AI coding agents must:
 
-Do not mix unrelated changes into the same task.
+1. Read AGENTS.md.
+2. Inspect existing implementation.
+3. Identify relevant reusable code.
+4. Understand current architecture.
+5. Plan the change.
+6. Implement the smallest appropriate solution.
+7. Verify the result.
+8. Report what changed.
 
-Before changing a file, understand its current purpose.
-
-Avoid:
-
-* Unrelated formatting changes
-* Unnecessary renaming
-* Unnecessary file movement
-* Large unrelated refactors
-* Removing working code without reason
-
-If a refactor is necessary, explain why it is necessary.
+Do not generate large amounts of code before understanding the repository.
 
 ---
 
-# 53. AI Agent Behaviour
+# 53. Do Not Invent Requirements
 
-AI coding agents must behave as engineering assistants, not blind code generators.
+Do not invent:
 
-Before coding:
+* Features
+* Screens
+* APIs
+* Socket events
+* Database fields
+* UX behavior
+* Game rules
+* Dependencies
 
-1. Understand the request.
-2. Inspect the repository.
-3. Inspect relevant existing code.
-4. Check documentation.
-5. Identify reusable components.
-6. Identify possible side effects.
-7. Make a plan.
-8. Implement the smallest appropriate solution.
-9. Verify the result.
+If something is unclear:
 
-Do not immediately start creating files without understanding the existing architecture.
+* Inspect existing implementation first.
+* Check relevant game documentation.
+* Follow established project patterns.
+* Make the least-assumptive implementation.
 
-When implementing game UI:
-
-* Follow the universal game rules in this file.
-* Check the relevant `docs/games/` documentation.
-* Reuse existing components where appropriate.
-* Do not duplicate turn/result/control logic unnecessarily.
-* Do not modify unrelated games.
+Ask for clarification only when the ambiguity materially affects architecture or behavior.
 
 ---
 
-# 54. Do Not Invent Requirements
+# 54. Do Not Over-Engineer
 
-Never silently invent product requirements.
+Do not build infrastructure for hypothetical future requirements.
 
-If something is unspecified and materially affects architecture:
-
-* Ask for clarification, OR
-* Choose the least-assumptive implementation and clearly document the assumption.
-
-Do not introduce features merely because they are common in similar apps.
-
-Examples of features that should NOT be added without requirement:
-
-* Leaderboards
-* Achievements
-* Chat history
-* Spectator mode
-* Voice chat
-* Complex ranking systems
-* Payments
-* Push notifications
-* Social feeds
-* Unrequested analytics
-
----
-
-# 55. Do Not Over-Engineer
+Implement what is currently required while keeping the architecture reasonably extensible.
 
 Avoid unnecessary:
 
-* Design patterns
-* Abstraction layers
-* Interfaces
+* Abstractions
 * Factories
-* Generic frameworks
-* Dependencies
+* Generic engines
+* Configuration layers
+* Packages
 * Microservices
-* Database collections
-* Socket events
-
-Architecture should match the actual complexity of the project.
-
-Use advanced patterns only when they solve a real problem.
-
-Do not create a giant universal game framework simply to make every game look architecturally identical.
 
 ---
 
-# 56. Performance Claims
+# 55. Performance Claims
 
 Never claim:
 
-* "20x faster"
-* "uses 50% less memory"
-* "reduces network by 80%"
-* "build is significantly smaller"
+```text
+10x faster
+20x faster
+50% less memory
+```
 
-unless the improvement has actually been measured.
+unless it has actually been measured.
 
-Use factual language such as:
-
-> "This removes the duplicate API request."
-
-or:
-
-> "This avoids creating a second socket listener."
-
-When performance is important, measure before and after where practical.
+Use measurable evidence when discussing performance.
 
 ---
 
-# 57. Performance Priorities
+# 56. Performance Priorities
 
-When optimizing, consider:
+Prioritize:
 
-### CPU
+```text
+Correctness
+↓
+Smooth UX
+↓
+Network efficiency
+↓
+Rendering efficiency
+↓
+Memory efficiency
+```
 
-Avoid unnecessary expensive calculations.
-
-### Memory
-
-Avoid retained listeners, controllers, timers, large objects, and unnecessary caches.
-
-### Rendering
-
-Avoid unnecessary rebuilds.
-
-### Network
-
-Avoid duplicate requests and unnecessary payloads.
-
-### Storage
-
-Avoid unnecessary database writes.
-
-### App Size
-
-Avoid unnecessary dependencies and oversized assets.
-
-### Battery
-
-Avoid unnecessary background work, timers, polling, and continuous animations.
+Do not sacrifice correctness for premature optimization.
 
 ---
 
-# 58. Scalability
+# 57. Scalability
 
-The initial implementation should remain simple but should not intentionally block future growth.
-
-The architecture should make it reasonably possible to add:
+Architecture should allow:
 
 * More games
-* More players per game
-* More bot intelligence
-* More authentication methods
-* More game modes
-* More profile features
-* More server instances later
+* More players
+* More game sessions
+* More matchmaking
+* More friends
+* More game-specific logic
 
-Do not prematurely build infrastructure for hypothetical massive scale.
-
-Build today's requirements cleanly while avoiding obvious architectural dead ends.
+without duplicating platform-wide systems.
 
 ---
 
-# 59. API Design
+# 58. API
 
-APIs should be:
+API design should be:
 
 * Predictable
-* Validated
 * Consistent
-* Versionable when appropriate
-* Explicit about success/failure
+* Validated
+* Clearly named
 
-Use appropriate HTTP semantics.
-
-Avoid returning unnecessary data.
-
-Avoid APIs that expose internal database structures directly to clients.
+Use consistent response/error structures.
 
 ---
 
-# 60. Database Design
+# 59. Database
 
-Design schemas around actual product requirements.
+Database models should represent actual persistent requirements.
 
-Prefer normalized or appropriately structured data over duplicated information when practical.
-
-Do not store derived information unnecessarily if it can safely be calculated or maintained from authoritative data.
-
-However, if a frequently accessed statistic is intentionally persisted for performance, document why.
-
-Indexes should be added based on actual query patterns.
+Do not duplicate the same information across multiple collections without a clear reason.
 
 ---
 
-# 61. Environment Configuration
+# 60. Environment
 
-Environment-specific configuration must not be hardcoded into source code when it should be configurable.
+Keep secrets and environment-specific configuration out of source control.
 
-Separate development and production configuration appropriately.
+Use environment variables/configuration appropriately.
 
-Never commit secrets.
+---
 
-Examples:
+# 61. Navigation
+
+Navigation should remain centralized and predictable.
+
+Games should not directly manipulate unrelated platform navigation state.
+
+Important lifecycle rule:
 
 ```text
-DATABASE_URL
-JWT_SECRET
-SERVER_URL
+Entering a game
+↓
+Playing
+↓
+Game ends
+↓
+Result
+↓
+Leaving game
 ```
 
-Actual variable names may differ.
+must not leak game-specific device orientation or other temporary global state into the rest of the application.
 
 ---
 
-# 62. Navigation
+# 62. Lobby
 
-Navigation should remain predictable.
+The lobby should remain platform-wide.
 
-Avoid tightly coupling game logic to navigation logic.
-
-A game should be able to end and return to the appropriate previous screen without embedding navigation decisions throughout the game engine.
-
-Navigation should primarily be handled at the presentation/application layer.
-
-Game Result screens/states should provide result-specific actions such as:
-
-* Play Again
-* Exit
-
-The result state should expose the outcome and available actions, while the appropriate presentation/application layer handles navigation.
-
-Do not tightly couple game-engine rules directly to Flutter navigation.
+It should use game metadata rather than hardcoded game-specific UI logic wherever practical.
 
 ---
 
-# 63. Game Lobby
+# 63. Bottom Navigation
 
-The Game Lobby should be data-driven.
+Bottom navigation should remain consistent across platform-level screens.
 
-A game card should ideally be generated from game metadata.
+Games may use their own gameplay UI.
 
-Avoid manually duplicating:
-
-```text
-Game 1 card
-Game 2 card
-Game 3 card
-Game 4 card
-```
-
-when a reusable model/list can represent them.
-
-The lobby may contain:
-
-* Featured game
-* Available games
-* Coming soon games
-* Game categories if required later
-
-Do not implement actual gameplay when a task only requests the lobby.
+Do not unnecessarily show platform navigation controls inside active gameplay.
 
 ---
 
-# 64. Bottom Navigation
+# 64. Product Name
 
-The application currently has three bottom navigation tabs.
-
-Do not rewrite or redesign the bottom navigation unless explicitly requested.
-
-When implementing another screen:
-
-* Reuse the existing navigation structure.
-* Follow the existing theme.
-* Do not replace working navigation unnecessarily.
-
----
-
-# 65. Product Name
-
-The current working name is:
+Current product name may be:
 
 ```text
 Partner Play
 ```
 
-The name may change later.
+Treat the name as configurable until final branding is confirmed.
 
-Do not tightly couple technical identifiers to the product name unless necessary.
-
----
-
-# 66. Ads
-
-The application is currently free.
-
-Ads may be introduced later.
-
-Do not implement an advertising system unless explicitly requested.
-
-When ads are eventually introduced, ensure they do not unnecessarily damage:
-
-* Game interaction
-* Performance
-* User experience
-* Navigation
-* Accessibility
+Do not hardcode the name unnecessarily across architecture.
 
 ---
 
-# 67. Accessibility
+# 65. Ads
 
-Where practical, support:
+Ads should not interfere with:
+
+* Gameplay
+* Touch controls
+* Turn indicators
+* Result screens
+* Important game state
+
+Avoid intrusive placements.
+
+---
+
+# 66. Accessibility
+
+Maintain:
 
 * Readable text
-* Adequate touch target sizes
-* Clear visual hierarchy
-* Meaningful labels
 * Sufficient contrast
-* Non-color-only indicators
+* Large enough touch targets
+* Clear state communication
+* Color-independent status communication
 
-Do not make important game information understandable only through color.
-
-For game turns and results, use both:
-
-* Color
-* Text/visual state
-
-Accessibility should be considered without compromising the playful visual identity.
+Do not use color as the only signal.
 
 ---
 
-# 68. Internationalization
+# 67. Internationalization
 
-Do not hardcode user-facing strings across business logic.
+Avoid hardcoding user-facing strings directly throughout widgets.
 
-If internationalization is introduced later, the architecture should not make extraction unnecessarily difficult.
+Keep future localization in mind.
 
-Do not implement a full localization system unless required.
-
-Game result strings such as:
-
-* BLUE PLAYER WIN
-* RED PLAYER WIN
-* BOT WIN
-* BLUE TURN
-* RED TURN
-
-should remain presentation-layer text and should be localizable later if required.
+Do not build a full localization architecture unless required.
 
 ---
 
-# 69. Documentation
+# 68. Documentation
 
-When introducing a significant architectural decision, document it.
+Document:
 
-Useful documentation locations:
+* Important architecture decisions
+* Game-specific rules
+* Non-obvious behavior
+* Exceptions
+* Important socket contracts
+* Important API contracts
 
-```text
-docs/
-
-├── architecture/
-
-├── games/
-
-└── decisions/
-```
-
-Examples:
-
-```text
-docs/architecture/multiplayer.md
-docs/games/tic_tac_toe.md
-docs/decisions/temporary-chat.md
-```
-
-Do not document trivial implementation details unnecessarily.
+Documentation should explain **why**, not only what.
 
 ---
 
-# 70. Definition of Done
+# 69. Definition of Done
 
-A feature is not considered complete merely because the code compiles.
+A feature is not complete merely because the code compiles.
 
-Before considering a task complete, verify where applicable:
+Definition of Done:
 
-* Feature works
-* Existing functionality still works
-* No duplicate implementation was introduced
-* Loading state works
-* Error state works
-* Empty state works
-* Reconnection is considered
-* Resources are disposed
-* Socket listeners are cleaned up
-* Timers are cleaned up
-* No unnecessary network requests were introduced
-* No unnecessary database writes were introduced
-* No unnecessary dependency was added
-* Relevant tests pass
-* Code follows existing architecture
-* UI is responsive
-* UI follows the product's visual direction
-* No unrelated code was modified
-* Game result state works where applicable
-* Result countdown is cleaned up correctly where applicable
-* Play Again starts a fresh game where applicable
-* Exit returns to the appropriate flow where applicable
+* Correct behavior implemented
+* Existing architecture respected
+* Reusable code reused
+* No unnecessary dependencies
+* No unrelated rewrites
+* UI verified
+* Edge cases considered
+* Resources disposed
+* Relevant tests run
+* Static analysis run where applicable
+* No obvious regressions
+* Documentation updated when behavior/architecture changed
 
 ---
 
-# 71. Agent Verification
+# 70. Verification
 
-After implementation, agents should verify:
+After implementation, run the appropriate verification.
 
-### Flutter
+For Flutter changes, typically:
 
-```text
+```bash
 flutter analyze
 ```
 
-and appropriate tests/build checks when relevant.
+and relevant tests.
 
-### Backend
-
-Run appropriate lint/test/startup checks according to the existing project configuration.
-
-### Integration
-
-If the task affects:
-
-* Authentication
-* Socket.IO
-* Game state
-* Timers
-* Matchmaking
-* Friend games
-* Chat
-
-perform appropriate integration-level verification rather than checking only compilation.
-
-For game UI changes, verify:
-
-* Correct player identity
-* Correct player colors
-* Correct orientation
-* Correct player positioning
-* Correct turn indication
-* Correct result screen
-* Correct result countdown
-* Correct available controls
-
-Do not claim tests were run if they were not actually run.
-
----
-
-# 72. When a Requirement Conflicts With Existing Code
-
-If the requested feature conflicts with an existing architectural decision:
-
-1. Identify the conflict.
-2. Inspect whether the old behavior is intentional.
-3. Determine the smallest safe change.
-4. Avoid silently breaking existing behavior.
-5. Explain important tradeoffs when necessary.
-
-Do not automatically rewrite the architecture.
-
-If existing game behavior conflicts with an explicit universal product rule, follow the documented product rule unless the game-specific documentation explicitly defines a valid exception.
-
----
-
-# 73. When Adding a New Game
-
-When a new game is added:
-
-1. Create game metadata.
-2. Create game-specific documentation.
-3. Define player count.
-4. Define supported modes.
-5. Define orientation.
-6. Define local interaction model.
-7. Define timer requirements.
-8. Define win/draw conditions.
-9. Define bot support if applicable.
-10. Implement game logic separately.
-11. Integrate with the common game/session system.
-12. Add UI.
-13. Add online synchronization if supported.
-14. Add offline behavior if supported.
-15. Add tests for core game rules.
-16. Define any game-specific result behavior.
-17. Define any game-specific control/revert behavior.
-18. Define any game-specific visual exceptions.
-
-Do not duplicate the entire multiplayer architecture for each game.
-
----
-
-# 74. New Feature Checklist
-
-Before adding a feature, ask:
+For backend changes, run the appropriate:
 
 ```text
-Is this required?
-
-Does something already do this?
-
-Can existing code be extended?
-
-Does this belong to platform-level code or game-specific code?
-
-Does it need persistence?
-
-Does it need Socket.IO?
-
-Does it need MongoDB?
-
-Does it need a new dependency?
-
-Does it increase app size?
-
-Does it increase network traffic?
-
-Does it introduce lifecycle complexity?
-
-How does it behave offline?
-
-How does it behave after reconnect?
-
-What happens on failure?
-
-What happens when the game ends?
-
-Does it need a result state?
-
-Does it need a timer?
-
-Does it need cleanup/disposal?
+lint
+tests
+build
 ```
 
----
+commands already used by the project.
 
-# 75. Universal Engineering Rule
-
-When choosing between two valid implementations, prefer the one that provides:
-
-* Less unnecessary code
-* Fewer unnecessary dependencies
-* Fewer unnecessary network calls
-* Fewer unnecessary database writes
-* Fewer unnecessary rebuilds
-* Fewer unnecessary socket events
-* Lower memory usage
-* Smaller assets
-* Clearer responsibilities
-* Better reuse
-* Easier maintenance
-
-But do NOT choose an implementation merely because it has fewer lines.
-
-The correct goal is:
-
-> **Small, fast, clear, reusable, reliable, and maintainable.**
-
-These engineering principles also apply to game UI and gameplay architecture.
-
-Prefer:
-
-* Shared player identity rules over duplicated player-color logic
-* Reusable turn-indicator behavior where genuinely shared
-* Reusable result-state behavior where genuinely shared
-* Capability-driven controls instead of showing every action for every game
-* Game-specific implementations where games genuinely differ
-
-Do not sacrifice clarity or legitimate game-specific requirements merely to maximize reuse.
+Do not claim a test was run if it was not actually run.
 
 ---
 
-# 76. Final Agent Rule
+# 71. Conflict Resolution
 
-Before making a change, think:
+When requirements conflict:
+
+1. Prefer explicit current product requirements.
+2. Prefer documented game-specific requirements for game-specific behavior.
+3. Prefer this AGENTS.md for universal platform rules.
+4. Inspect existing architecture before deciding.
+5. Avoid breaking existing working behavior.
+6. If ambiguity materially affects architecture, ask for clarification.
+
+Do not silently invent a new rule.
+
+---
+
+# 72. Adding a New Game
+
+When adding a new game:
+
+1. Define game metadata.
+2. Define supported player counts.
+3. Define supported modes.
+4. Define local interaction model.
+5. Define layout orientation.
+6. Define turn indicator layout where applicable.
+7. Define game rules.
+8. Create isolated game logic.
+9. Reuse platform systems.
+10. Add game-specific documentation.
+11. Add required assets.
+12. Add tests.
+13. Verify lifecycle and cleanup.
+
+Do not duplicate:
+
+* Auth
+* Friends
+* Matchmaking
+* Chat
+* Socket infrastructure
+* Common result UI
+* Common turn indicator infrastructure
+* Common API infrastructure
+
+unless there is a genuine game-specific requirement.
+
+---
+
+# 73. Feature Checklist
+
+Before implementing a feature, ask:
+
+```text
+Is this platform-wide?
+Is this game-specific?
+Does something reusable already exist?
+Can the existing component/model be extended?
+Will this affect other games?
+Does this change device orientation?
+Does this change only game layout?
+Does this introduce temporary global state?
+Does that state get cleaned up?
+```
+
+Especially for orientation-related changes:
+
+```text
+Game layout orientation?
+OR
+Physical device orientation?
+```
+
+Never treat these as automatically equivalent.
+
+---
+
+# 74. Engineering Rule
+
+Follow:
 
 ```text
 Understand
@@ -2570,32 +1930,41 @@ Implement
    ↓
 Verify
    ↓
-Clean up
+Clean Up
 ```
 
-Never:
+Avoid:
 
 ```text
 Guess
-  ↓
+ ↓
 Generate lots of code
-  ↓
+ ↓
 Add dependencies
-  ↓
-Rewrite existing code
-  ↓
+ ↓
+Rewrite existing systems
+ ↓
 Hope it works
 ```
 
-The agent must behave like a careful engineer working on a real production project.
+---
 
-When uncertain, preserve existing working behavior and ask for clarification when the decision materially affects architecture or product behavior.
+# 75. Final Agent Rule
 
-When implementing any game, the agent must check both:
+The goal is not to write the most code.
 
-1. Universal rules in this `AGENTS.md`
-2. Game-specific rules in `docs/games/<game>.md`
+The goal is to make the **smallest correct, maintainable, reusable change that fits the existing architecture and product requirements.**
 
-The agent must not silently override a documented product rule.
+Always preserve existing working behavior unless the requirement explicitly asks for it to change.
 
-Before making a significant product or architecture assumption, explain the assumption rather than inventing requirements.
+When implementing game UI, distinguish between:
+
+```text
+Game's visual/layout orientation
+        ≠
+Physical device orientation
+```
+
+A horizontal game does not automatically mean the phone should rotate to landscape.
+
+A game-specific visual requirement must not accidentally change the orientation or behavior of the rest of the application.

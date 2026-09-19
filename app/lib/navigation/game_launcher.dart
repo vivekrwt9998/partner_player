@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/game_definition.dart';
 import '../screens/games/four_in_a_row/four_in_a_row_screen.dart';
+import '../screens/games/tic_tac_toe/tic_tac_toe_screen.dart';
 
 /// Centralized game routing and launch coordinator.
 ///
@@ -11,10 +12,12 @@ class GameLauncher {
   static bool isModeAvailable(GameDefinition game, GameMode mode) {
     if (game.status != GameStatus.available) return false;
 
-    // Current phase: Four in a Row supports its offline Local and Bot modes.
+    // Current phase: Four in a Row supports its offline Local and Bot modes;
+    // Tic Tac Toe only has its Local mode built so far (AGENTS.md §72).
     return switch ((game.id, mode)) {
       ('four_in_a_row', GameMode.local) => true,
       ('four_in_a_row', GameMode.bot) => true,
+      ('tic_tac_toe', GameMode.local) => true,
       _ => false,
     };
   }
@@ -58,6 +61,8 @@ class GameLauncher {
         const FourInARowScreen(mode: GameMode.local),
       ('four_in_a_row', GameMode.bot) =>
         const FourInARowScreen(mode: GameMode.bot),
+      ('tic_tac_toe', GameMode.local) =>
+        const TicTacToeScreen(mode: GameMode.local),
       _ => null,
     };
   }

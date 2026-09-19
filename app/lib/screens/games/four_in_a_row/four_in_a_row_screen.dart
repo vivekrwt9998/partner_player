@@ -1,128 +1,242 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../../data/games_registry.dart';
 import '../../../models/game_definition.dart';
 import '../../../games/four_in_a_row/logic/four_in_a_row_game.dart';
 import '../../../games/four_in_a_row/models/four_in_a_row_models.dart';
 import '../../../games/four_in_a_row/presentation/four_in_a_row_match_controller.dart';
+import '../../../widgets/turn_indicator.dart';
 import '../../game_result_screen.dart';
 
 /// Four in a Row landscape gameplay screen matching the exact reference design.
 ///
-class _BoardInnerClipper extends CustomClipper<Rect> {
-  @override
-  Rect getClip(Size size) {
-    return Rect.fromLTWH(5, 5, size.width - 10, size.height - 10);
-  }
+/// Shared board metrics used by every board layer.
+///
+/// The socket layer, the disc layer, the punched board surface and the winning
+/// line all derive their positions from this single source of truth, so a disc
+/// always lines up exactly with the hole it belongs to.
+class _BoardGeometry {
+  /// Grid inset from the board frame (left/right/top).
+  static const double framePadding = 12.0;
 
-  @override
-  bool shouldReclip(covariant _BoardInnerClipper oldClipper) => false;
-}
+  /// Grid inset from the bottom of the board frame.
+  static const double frameBottomPadding = 8.0;
 
-class _HoleRimPainter extends CustomPainter {
-  final int row;
-  final int col;
-  final double horizontalPadding;
-  final double verticalPadding;
-  final double bottomPadding;
+  /// Gap between a cell box and the disc/hole drawn inside it.
+  static const double cellInset = 3.5;
 
-  const _HoleRimPainter({
-    required this.row,
-    required this.col,
-    required this.horizontalPadding,
-    required this.verticalPadding,
-    required this.bottomPadding,
+  /// Thickness of the black board frame border.
+  static const double frameBorderWidth = 5.0;
+
+  /// Corner radius of the board frame.
+  static const double frameRadius = 28.0;
+
+  /// Thickness of the black rim drawn around every hole.
+  static const double holeRimWidth = 4.0;
+
+  final Size size;
+  final double cellWidth;
+  final double cellHeight;
+  final double discSize;
+
+  const _BoardGeometry._({
+    required this.size,
+    required this.cellWidth,
+    required this.cellHeight,
+    required this.discSize,
   });
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    const rows = FourInARowGame.rows;
-    const cols = FourInARowGame.cols;
-    final cellWidth = (size.width - horizontalPadding * 2) / cols;
+  factory _BoardGeometry.fromSize(Size size) {
+    final cellWidth = (size.width - (framePadding * 2)) / FourInARowGame.cols;
     final cellHeight =
-        (size.height - verticalPadding - bottomPadding) / rows;
-    final radius = (cellWidth < cellHeight ? cellWidth : cellHeight) / 2 - 3.5;
-    final rimPaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
+        (size.height - framePadding - frameBottomPadding) / FourInARowGame.rows;
+    final discSize = math.min(cellWidth, cellHeight) - (cellInset * 2);
 
-    canvas.drawCircle(
-      Offset(
-        horizontalPadding + (col * cellWidth) + cellWidth / 2,
-        verticalPadding + (row * cellHeight) + cellHeight / 2,
-      ),
-      radius,
-      rimPaint,
+    return _BoardGeometry._(
+      size: size,
+      cellWidth: cellWidth,
+      cellHeight: cellHeight,
+      discSize: discSize > 0 ? discSize : 0,
     );
   }
 
-  @override
-  bool shouldRepaint(covariant _HoleRimPainter oldDelegate) {
-    return oldDelegate.row != row ||
-      oldDelegate.col != col ||
-        oldDelegate.horizontalPadding != horizontalPadding ||
-        oldDelegate.verticalPadding != verticalPadding ||
-        oldDelegate.bottomPadding != bottomPadding;
+  double get discRadius => discSize / 2;
+
+  /// Center of the hole at [row]/[col], in board-local coordinates.
+  Offset centerOf(int row, int col) {
+    return Offset(
+      framePadding + (col * cellWidth) + (cellWidth / 2),
+      framePadding + (row * cellHeight) + (cellHeight / 2),
+    );
   }
+
+  /// Top-left corner of the disc that belongs to [row]/[col].
+  Offset discOriginOf(int row, int col) {
+    final center = centerOf(row, col);
+    return Offset(center.dx - discRadius, center.dy - discRadius);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _BoardGeometry &&
+          size == other.size &&
+          cellWidth == other.cellWidth &&
+          cellHeight == other.cellHeight &&
+          discSize == other.discSize;
+
+  @override
+  int get hashCode => Object.hash(size, cellWidth, cellHeight, discSize);
 }
 
-/// Custom painter that draws a quarter-circle corner arc with a smooth curved white border.
-class _CornerArcPainter extends CustomPainter {
-  final Color fillColor;
-  final Color borderColor;
-  final double borderWidth;
-  final bool isLeft;
+/// Paints the physical front surface of the board: the charcoal panel with a
+/// hole punched out for every slot, the frame border and the hole rims.
+///
+/// This layer is painted *above* the disc layer, so a disc is only ever visible
+/// through a hole. That is what makes a disc look like it travels inside the
+/// board and settles into a hole instead of sliding across the board surface.
+class _BoardSurfacePainter extends CustomPainter {
+  final _BoardGeometry geometry;
+  final Color surfaceColor;
 
-  _CornerArcPainter({
-    required this.fillColor,
-    required this.borderColor,
-    required this.borderWidth,
-    required this.isLeft,
+  const _BoardSurfacePainter({
+    required this.geometry,
+    required this.surfaceColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path();
-    final borderPath = Path();
+    final outer = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(_BoardGeometry.frameRadius),
+    );
 
-    if (isLeft) {
-      path.moveTo(0, size.height);
-      path.lineTo(0, 0);
-      path.quadraticBezierTo(size.width * 0.75, 0, size.width, size.height);
-      path.close();
-
-      borderPath.moveTo(0, 0);
-      borderPath.quadraticBezierTo(size.width * 0.75, 0, size.width, size.height);
-    } else {
-      path.moveTo(size.width, size.height);
-      path.lineTo(size.width, 0);
-      path.quadraticBezierTo(size.width * 0.25, 0, 0, size.height);
-      path.close();
-
-      borderPath.moveTo(size.width, 0);
-      borderPath.quadraticBezierTo(size.width * 0.25, 0, 0, size.height);
+    final holes = Path();
+    for (int row = 0; row < FourInARowGame.rows; row++) {
+      for (int col = 0; col < FourInARowGame.cols; col++) {
+        holes.addOval(
+          Rect.fromCircle(
+            center: geometry.centerOf(row, col),
+            radius: geometry.discRadius,
+          ),
+        );
+      }
     }
 
-    final fillPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(path, fillPaint);
+    // Board panel with the holes cut out of it.
+    final surface = Path.combine(
+      PathOperation.difference,
+      Path()..addRRect(outer),
+      holes,
+    );
+    canvas.drawPath(
+      surface,
+      Paint()
+        ..color = surfaceColor
+        ..style = PaintingStyle.fill,
+    );
 
-    final strokePaint = Paint()
-      ..color = borderColor
+    // Frame border, painted here so a disc entering the board is occluded by it.
+    canvas.drawRRect(
+      outer.deflate(_BoardGeometry.frameBorderWidth / 2),
+      Paint()
+        ..color = Colors.black
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _BoardGeometry.frameBorderWidth,
+    );
+
+    // Rim of every hole, painted over the disc so the hole edge always wins.
+    final rimRadius = geometry.discRadius - (_BoardGeometry.holeRimWidth / 2);
+    if (rimRadius <= 0) return;
+
+    final rimPaint = Paint()
+      ..color = Colors.black
       ..style = PaintingStyle.stroke
-      ..strokeWidth = borderWidth
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(borderPath, strokePaint);
+      ..strokeWidth = _BoardGeometry.holeRimWidth;
+    for (int row = 0; row < FourInARowGame.rows; row++) {
+      for (int col = 0; col < FourInARowGame.cols; col++) {
+        canvas.drawCircle(geometry.centerOf(row, col), rimRadius, rimPaint);
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _CornerArcPainter oldDelegate) {
-    return oldDelegate.fillColor != fillColor ||
-        oldDelegate.borderColor != borderColor ||
-        oldDelegate.isLeft != isLeft;
+  bool shouldRepaint(covariant _BoardSurfacePainter oldDelegate) {
+    return oldDelegate.geometry != geometry ||
+        oldDelegate.surfaceColor != surfaceColor;
+  }
+}
+
+/// While the physical device is portrait, rotates [child] 90° so the screen
+/// visibly reads as the landscape composition it is — a "please turn your
+/// phone" cue, matching how many landscape-only games behave, rather than
+/// the game being comfortably playable while held portrait. The moment the
+/// device is actually landscape, [child] renders completely normally with
+/// no rotation at all: that is the real, played experience, and every bit
+/// of board/animation code inside [child] is untouched by this wrapper —
+/// it only ever changes how the *already-correct* output is displayed.
+///
+/// This is a pure software pixel transform. It never calls
+/// `SystemChrome.setPreferredOrientations` and never touches the device's
+/// actual physical orientation (AGENTS.md §8.2); it is also intentionally
+/// local to this one screen, not a reusable/global orientation service
+/// (AGENTS.md §54 — no infrastructure beyond what this game needs today).
+class _PortraitRotationHint extends StatelessWidget {
+  final Widget child;
+
+  const _PortraitRotationHint({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final physicalSize = constraints.biggest;
+        final isPortrait = physicalSize.height > physicalSize.width;
+        if (!isPortrait) return child;
+
+        final mq = MediaQuery.of(context);
+
+        return OverflowBox(
+          alignment: Alignment.center,
+          minWidth: physicalSize.height,
+          maxWidth: physicalSize.height,
+          minHeight: physicalSize.width,
+          maxHeight: physicalSize.width,
+          child: Transform.rotate(
+            angle: math.pi / 2,
+            child: MediaQuery(
+              data: mq.copyWith(
+                size: Size(physicalSize.height, physicalSize.width),
+                padding: _rotateClockwise(mq.padding),
+                viewPadding: _rotateClockwise(mq.viewPadding),
+                viewInsets: _rotateClockwise(mq.viewInsets),
+              ),
+              child: SizedBox(
+                width: physicalSize.height,
+                height: physicalSize.width,
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Remaps [insets] the way its edges land after the content is rotated
+  /// 90° clockwise to fill the physical portrait screen: the content's left
+  /// edge ends up at the physical top, its top edge at the physical right,
+  /// its right edge at the physical bottom, and its bottom edge at the
+  /// physical left.
+  static EdgeInsets _rotateClockwise(EdgeInsets insets) {
+    return EdgeInsets.fromLTRB(
+      insets.top,
+      insets.right,
+      insets.bottom,
+      insets.left,
+    );
   }
 }
 
@@ -130,7 +244,7 @@ class _CornerArcPainter extends CustomPainter {
 /// - Dynamic background: soft blue on Blue turn, soft coral on Red turn
 /// - Centered Dark Navy Blue board (#0D2F62) with intentional surrounding background spacing
 /// - Floating turn indicators near the bottom corners
-/// - 3-dot options menu in top right (Exit Game, Restart, Revert)
+/// - 3-dot options menu in top right (Revert, Restart, Exit Game)
 /// - Normal discs with animated glowing white winning line & node dots
 /// - Seamless transition to full-screen celebratory GameResultScreen
 class FourInARowScreen extends StatefulWidget {
@@ -149,6 +263,12 @@ class _FourInARowScreenState extends State<FourInARowScreen>
   with TickerProviderStateMixin {
   late final FourInARowMatchController _matchController;
 
+  /// This game's metadata, looked up once so the turn indicator layout is
+  /// driven by configuration rather than hardcoded in this screen (AGENTS.md
+  /// §10.1.6).
+  static final GameDefinition _definition =
+      kGames.firstWhere((g) => g.id == 'four_in_a_row');
+
   // Color Palette matching design specification
   static const Color _bluePlayerColor = Color(0xFF00ACF8); // Blue Player Disc
   static const Color _redPlayerColor = Color(0xFFFF5E57); // Red Player Disc
@@ -163,6 +283,7 @@ class _FourInARowScreenState extends State<FourInARowScreen>
   FourInARowMove? _fallingDisc;
   int _previewColumn = FourInARowGame.cols ~/ 2;
   bool _isTransitioningToResult = false;
+  bool _isOptionsMenuOpen = false;
   Timer? _resultTransitionTimer;
 
   @override
@@ -170,11 +291,9 @@ class _FourInARowScreenState extends State<FourInARowScreen>
     super.initState();
     _matchController = FourInARowMatchController(mode: widget.mode)
       ..addListener(_onMatchStateChanged);
-    // Lock to landscape for Four in a Row
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    // Four in a Row's board is landscape-*style*, but that is a layout
+    // choice, not a physical device rotation (AGENTS.md §8). The board below
+    // adapts to whatever orientation the device is already in.
 
     _winningLineController = AnimationController(
       vsync: this,
@@ -191,9 +310,15 @@ class _FourInARowScreenState extends State<FourInARowScreen>
       duration: const Duration(milliseconds: 600),
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
+          // The disc has visually landed: only now may the destination cell
+          // take its occupied state and the winning line appear.
+          final landedMove = _fallingDisc;
           setState(() {
             _fallingDisc = null;
           });
+          if (landedMove?.status == FourInARowGameStatus.won) {
+            _winningLineController.forward(from: 0.0);
+          }
           _matchController.onMoveAnimationCompleted();
           if (_matchController.isResultReady) {
             _scheduleResultTransition();
@@ -210,13 +335,6 @@ class _FourInARowScreenState extends State<FourInARowScreen>
       ..dispose();
     _winningLineController.dispose();
     _fallingDiscController.dispose();
-    // Restore all orientations when leaving
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
     super.dispose();
   }
 
@@ -290,9 +408,6 @@ class _FourInARowScreenState extends State<FourInARowScreen>
         _fallingDisc = activeMove;
       });
       _fallingDiscController.forward(from: 0.0);
-      if (activeMove.status == FourInARowGameStatus.won) {
-        _winningLineController.forward(from: 0.0);
-      }
       return;
     }
 
@@ -317,82 +432,175 @@ class _FourInARowScreenState extends State<FourInARowScreen>
 
   @override
   Widget build(BuildContext context) {
+    // The declared orientation behavior is the enforced contract for this
+    // screen's composition, not a decorative label: this screen only knows
+    // how to compose itself as fixedLandscape, and says so explicitly rather
+    // than silently rendering something else if that ever stops being true
+    // (e.g. a future edit to the registry, or this screen being reused for a
+    // game with different rules). See AGENTS.md §8.
+    final gameBody = switch (_definition.orientationBehavior) {
+      GameOrientationBehavior.fixedLandscape => _PortraitRotationHint(
+          child: _buildFixedLandscapeComposition(),
+        ),
+      GameOrientationBehavior.fixedPortrait ||
+      GameOrientationBehavior.adaptive =>
+        throw UnsupportedError(
+          'FourInARowScreen only implements '
+          'GameOrientationBehavior.fixedLandscape, but four_in_a_row is '
+          'declared as ${_definition.orientationBehavior}.',
+        ),
+    };
+
+    return PopScope(
+      canPop: true,
+      child: Scaffold(body: gameBody),
+    );
+  }
+
+  /// The screen's one and only supported composition: a landscape-shaped
+  /// (7:6) board, fit to whichever of the available width/height is more
+  /// constraining so it is never inverted into a portrait-shaped layout —
+  /// on a portrait phone it simply scales down, it never rotates the device
+  /// or the rendered pixels (AGENTS.md §8.1–§8.4). This is the literal
+  /// meaning of [GameOrientationBehavior.fixedLandscape] for this game, and
+  /// its algorithm is unchanged from before this behavior was enforced.
+  Widget _buildFixedLandscapeComposition() {
     final game = _matchController.game;
     final isBlueTurn = game.currentPlayer == FourInARowPlayer.player1;
     final currentBgColor = isBlueTurn ? _blueBgColor : _redBgColor;
 
-    return PopScope(
-      canPop: true,
-      child: Scaffold(
-        body: AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          color: currentBgColor,
-          child: SafeArea(
-            child: Stack(
-              children: [
-                // ── Centered Navy Board with Surrounding Background ──────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final maxBoardHeight = constraints.maxHeight * 0.97;
-                        final maxBoardWidth = maxBoardHeight *
-                            (FourInARowGame.cols / FourInARowGame.rows);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      color: currentBgColor,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            // ── Centered Navy Board with Surrounding Background ──────────
+            //
+            // The board keeps its landscape-*style* aspect ratio (7:6)
+            // regardless of the device's actual orientation (AGENTS.md
+            // §8): it is fit to whichever of the available width/height
+            // is more constraining, so it never overflows the canvas it is
+            // given.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const aspectRatio =
+                        FourInARowGame.cols / FourInARowGame.rows;
 
-                        return SizedBox(
-                          height: maxBoardHeight,
-                          width: maxBoardWidth,
-                          child: _buildBoard(),
-                        );
-                      },
-                    ),
-                  ),
-                ),
+                    // Both the preview disc and a freshly-dropped disc start
+                    // above the board's own top edge (see
+                    // _buildPreviewDiscOverlay and _buildFallingDiscOverlay:
+                    // `top: -geometry.cellHeight * 1.15` is the larger of the
+                    // two overflow amounts, so it's the one that must fit).
+                    // When height is the binding constraint (wide
+                    // screens/landscape), reserve exactly that much headroom
+                    // before fitting the board, so neither disc is ever
+                    // clipped by the top of the available area — a real,
+                    // pre-existing overflow bug (AGENTS.md §8.4) that the
+                    // previous flat percentage safety margin didn't actually
+                    // account for.
+                    //
+                    // Solving `height = availableHeight - headroom` where
+                    // `headroom = cellHeight * 1.15` and
+                    // `cellHeight = (height - framePadding -
+                    //     frameBottomPadding) / rows`
+                    // for `height` gives this closed form (a small constant
+                    // buffer is subtracted from the available height first).
+                    const rows = FourInARowGame.rows;
+                    const frameInset = _BoardGeometry.framePadding +
+                        _BoardGeometry.frameBottomPadding;
+                    const startOffsetFactor = 1.15;
+                    final availableHeight = constraints.maxHeight - 4;
+                    final heightConstrainedHeight = (rows * availableHeight +
+                            startOffsetFactor * frameInset) /
+                        (rows + startOffsetFactor);
+                    final widthAtHeightConstrained =
+                        heightConstrainedHeight * aspectRatio;
 
-                // ── Bottom-Left Quarter-Circle Turn Indicator (Blue) ────────
-                Positioned(
-                  left: 0,
-                  bottom: 0,
-                  child: _buildCornerTurnIndicator(
-                    color: _bluePlayerColor,
-                    label: 'BLUE TURN',
-                    isVisible: !game.isGameOver && isBlueTurn,
-                    isLeft: true,
-                  ),
-                ),
+                    double boardWidth;
+                    double boardHeight;
+                    if (widthAtHeightConstrained <= constraints.maxWidth) {
+                      boardWidth = widthAtHeightConstrained;
+                      boardHeight = heightConstrainedHeight;
+                    } else {
+                      boardWidth = constraints.maxWidth;
+                      boardHeight = boardWidth / aspectRatio;
+                    }
 
-                // ── Bottom-Right Quarter-Circle Turn Indicator (Red) ─────────
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: _buildCornerTurnIndicator(
-                    color: _redPlayerColor,
-                    label: 'RED TURN',
-                    isVisible: !game.isGameOver && !isBlueTurn,
-                    isLeft: false,
-                  ),
+                    return SizedBox(
+                      height: boardHeight,
+                      width: boardWidth,
+                      child: _buildBoard(),
+                    );
+                  },
                 ),
-
-                // ── Top-Right 3-Dot Options Button ─────────────────────────
-                Positioned(
-                  top: 10,
-                  right: 14,
-                  child: _buildOptionsMenu(),
-                ),
-              ],
+              ),
             ),
-          ),
+
+            // ── Reusable Turn Indicator (layout from game metadata) ─────
+            Positioned.fill(
+              child: TurnIndicatorOverlay(
+                layout: _definition.turnIndicatorLayout,
+                first: TurnIndicatorSpec(
+                  color: _bluePlayerColor,
+                  label: 'BLUE TURN',
+                  isActive: isBlueTurn,
+                ),
+                second: TurnIndicatorSpec(
+                  color: _redPlayerColor,
+                  label: 'RED TURN',
+                  isActive: !isBlueTurn,
+                ),
+                isGameOver: game.isGameOver,
+              ),
+            ),
+
+            // ── Options Menu Scrim + Panel (only while open) ────────────
+            //
+            // Deliberately not a PopupMenuButton: that widget shows its
+            // panel through the app's root Navigator/Overlay, which sits
+            // outside this screen's own widget subtree and therefore
+            // ignores the portrait "please rotate" composition's Transform
+            // (see _PortraitRotationHint) — it would pop up unrotated while
+            // everything else on screen is rotated. This panel is a normal
+            // Stack child instead, so it is always subject to the exact
+            // same rotation as the board and stays visually consistent.
+            if (_isOptionsMenuOpen) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _isOptionsMenuOpen = false),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+              Positioned(
+                top: 54,
+                right: 14,
+                child: _buildOptionsMenuPanel(),
+              ),
+            ],
+
+            // ── Top-Right 3-Dot Options Button ─────────────────────────
+            Positioned(
+              top: 10,
+              right: 14,
+              child: _buildOptionsButton(),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Builds the 3-dot options menu (Exit Game, Restart, Revert).
-  Widget _buildOptionsMenu() {
-    return PopupMenuButton<String>(
-      icon: Container(
+  /// The compact 3-dot button that opens/closes [_buildOptionsMenuPanel].
+  Widget _buildOptionsButton() {
+    return GestureDetector(
+      onTap: () => setState(() => _isOptionsMenuOpen = !_isOptionsMenuOpen),
+      child: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
@@ -412,165 +620,116 @@ class _FourInARowScreenState extends State<FourInARowScreen>
           size: 22,
         ),
       ),
-      tooltip: 'Options',
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      onSelected: (value) {
-        switch (value) {
-          case 'revert':
-            _revertMove();
-            break;
-          case 'restart':
-            _restartGame();
-            break;
-          case 'exit':
-            _exitGame();
-            break;
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          value: 'exit',
-          child: const Row(
-            children: [
-              Icon(Icons.logout_rounded, color: Colors.black87, size: 20),
-              SizedBox(width: 12),
-              Text(
-                'Exit Game',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'restart',
-          child: Row(
-            children: [
-              Icon(Icons.refresh_rounded, color: Colors.black87, size: 20),
-              SizedBox(width: 12),
-              Text(
-                'Restart',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (_matchController.supportsRevert)
-          PopupMenuItem<String>(
-            value: 'revert',
-            enabled: _matchController.canRevert,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.undo_rounded,
-                  color: _matchController.canRevert
-                      ? Colors.black87
-                      : Colors.grey.shade400,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Revert',
-                  style: TextStyle(
-                    color: _matchController.canRevert
-                        ? Colors.black87
-                        : Colors.grey.shade400,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
     );
   }
 
-  /// Builds the edge-attached quarter-circle turn indicator with curved white border.
-  Widget _buildCornerTurnIndicator({
-    required Color color,
-    required String label,
-    required bool isVisible,
-    required bool isLeft,
-  }) {
-    return AnimatedSlide(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOutBack,
-      offset: isVisible
-          ? Offset.zero
-          : (isLeft ? const Offset(-1.2, 0) : const Offset(1.2, 0)),
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 250),
-        opacity: isVisible ? 1.0 : 0.0,
-        child: CustomPaint(
-          painter: _CornerArcPainter(
-            fillColor: color,
-            borderColor: Colors.white,
-            borderWidth: 3.0,
-            isLeft: isLeft,
-          ),
-          child: Container(
-            width: 150,
-            height: 78,
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-                letterSpacing: 0.6,
+  /// The options dropdown panel (Revert, Restart, Exit Game), in that order.
+  Widget _buildOptionsMenuPanel() {
+    void select(VoidCallback action) {
+      setState(() => _isOptionsMenuOpen = false);
+      action();
+    }
+
+    return Material(
+      color: Colors.white,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_matchController.supportsRevert)
+              _buildOptionsMenuItem(
+                icon: Icons.undo_rounded,
+                label: 'Revert',
+                enabled: _matchController.canRevert,
+                onTap: () => select(_revertMove),
               ),
+            _buildOptionsMenuItem(
+              icon: Icons.refresh_rounded,
+              label: 'Restart',
+              enabled: true,
+              onTap: () => select(_restartGame),
             ),
-          ),
+            _buildOptionsMenuItem(
+              icon: Icons.logout_rounded,
+              label: 'Exit Game',
+              enabled: true,
+              onTap: () => select(_exitGame),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Deep Navy 7x6 board with disc slots and animated glowing winning line overlay.
+  Widget _buildOptionsMenuItem({
+    required IconData icon,
+    required String label,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    final color = enabled ? Colors.black87 : Colors.grey.shade400;
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Charcoal 7x6 board built as physical layers: sockets sit behind the board
+  /// surface, discs travel between them, and the punched surface is painted on
+  /// top so a disc is only ever visible through a hole.
   Widget _buildBoard() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const gridHorizontalPadding = 12.0;
-        const gridTopPadding = 12.0;
-        const gridBottomPadding = 8.0;
-        final cellWidth = (constraints.maxWidth -
-            (gridHorizontalPadding * 2)) /
-          FourInARowGame.cols;
-        final cellHeight = (constraints.maxHeight -
-            gridTopPadding -
-            gridBottomPadding) /
-          FourInARowGame.rows;
+        final geometry = _BoardGeometry.fromSize(constraints.biggest);
+        final game = _matchController.game;
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // Board frame. The grid is a separate layer so the falling disc can
-            // sit behind the target slot's rim.
-            Container(
-              decoration: BoxDecoration(
-                color: _boardColor,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.black, width: 5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+            // 1. Board body. Only the fill and the drop shadow live here; the
+            //    frame border belongs to the surface layer above the discs.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: _boardColor,
+                  borderRadius:
+                      BorderRadius.circular(_BoardGeometry.frameRadius),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
               ),
             ),
 
+            // 2. Socket layer: empty sockets and settled discs, behind the
+            //    board surface. Also owns the per-column tap targets.
             Positioned.fill(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                padding: const EdgeInsets.fromLTRB(
+                  _BoardGeometry.framePadding,
+                  _BoardGeometry.framePadding,
+                  _BoardGeometry.framePadding,
+                  _BoardGeometry.frameBottomPadding,
+                ),
                 child: Row(
                   children: List.generate(
                     FourInARowGame.cols,
@@ -593,46 +752,43 @@ class _FourInARowScreenState extends State<FourInARowScreen>
               ),
             ),
 
-            if (_fallingDisc == null && !_matchController.game.isGameOver)
-              _buildPreviewDiscOverlay(constraints),
+            // 3. Disc layer: the disc waiting above the board and the disc that
+            //    is currently travelling inside it. Still behind the surface.
+            if (_fallingDisc == null && !game.isGameOver)
+              _buildPreviewDiscOverlay(geometry),
 
-            // Animated Glowing White Winning Line Overlay with Nodes
-            if (_matchController.game.status == FourInARowGameStatus.won &&
-                _matchController.game.winningPositions.length >=
-                    FourInARowGame.connectCount)
+            if (_fallingDisc != null) _buildFallingDiscOverlay(geometry),
+
+            // 4. Board surface: charcoal panel with the holes punched out. It
+            //    occludes the disc layer everywhere except inside a hole.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _BoardSurfacePainter(
+                    geometry: geometry,
+                    surfaceColor: _boardColor,
+                  ),
+                ),
+              ),
+            ),
+
+            // 5. Animated Glowing White Winning Line Overlay with Nodes. Shown
+            //    only once the winning disc has actually landed.
+            if (game.status == FourInARowGameStatus.won &&
+                _fallingDisc == null &&
+                game.winningPositions.length >= FourInARowGame.connectCount)
               Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _winningLineAnimation,
                   builder: (context, _) {
                     return CustomPaint(
                       painter: _GlowingWinningLinePainter(
-                        winningPositions: _matchController.game.winningPositions,
-                        cellWidth: cellWidth,
-                        cellHeight: cellHeight,
-                        gridLeft: gridHorizontalPadding,
-                        gridTop: gridTopPadding,
+                        winningPositions: game.winningPositions,
+                        geometry: geometry,
                         progress: _winningLineAnimation.value,
                       ),
                     );
                   },
-                ),
-              ),
-
-            if (_fallingDisc != null)
-              _buildFallingDiscOverlay(
-                constraints,
-              ),
-
-            if (_fallingDisc != null)
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _HoleRimPainter(
-                    row: _fallingDisc!.row,
-                    col: _fallingDisc!.column,
-                    horizontalPadding: 12,
-                    verticalPadding: 12,
-                    bottomPadding: 8,
-                  ),
                 ),
               ),
           ],
@@ -641,101 +797,62 @@ class _FourInARowScreenState extends State<FourInARowScreen>
     );
   }
 
-  Widget _buildPreviewDiscOverlay(BoxConstraints constraints) {
-    const frameHorizontalPadding = 17.0;
-    final gridCellWidth =
-        (constraints.maxWidth - frameHorizontalPadding * 2) /
-            FourInARowGame.cols;
-    final gridCellHeight =
-        (constraints.maxHeight - 17 - 13) / FourInARowGame.rows;
-    final discSize = (gridCellWidth < gridCellHeight
-            ? gridCellWidth
-            : gridCellHeight) -
-        7;
+  /// The next disc, resting just above the board opening.
+  Widget _buildPreviewDiscOverlay(_BoardGeometry geometry) {
     final discColor =
         _matchController.game.currentPlayer == FourInARowPlayer.player1
         ? _bluePlayerColor
         : _redPlayerColor;
 
     return Positioned(
-      left: frameHorizontalPadding + (_previewColumn * gridCellWidth) +
-          ((gridCellWidth - discSize) / 2),
-      top: -discSize - 8,
-      width: discSize,
-      height: discSize,
+      left: geometry.discOriginOf(0, _previewColumn).dx,
+      top: -geometry.discSize - 8,
+      width: geometry.discSize,
+      height: geometry.discSize,
       child: _buildDisc(discColor),
     );
   }
 
-  Widget _buildFallingDiscOverlay(
-    BoxConstraints constraints,
-  ) {
+  /// The single disc that is currently falling towards its destination hole.
+  Widget _buildFallingDiscOverlay(_BoardGeometry geometry) {
     final move = _fallingDisc!;
-    final frameHorizontalPadding = 17.0;
-    final frameVerticalPadding = 17.0;
-    final gridCellWidth =
-        (constraints.maxWidth - frameHorizontalPadding * 2) /
-            FourInARowGame.cols;
-    final gridCellHeight =
-      (constraints.maxHeight - frameVerticalPadding - 13) /
-        FourInARowGame.rows;
-    final discSize = (gridCellWidth < gridCellHeight
-            ? gridCellWidth
-            : gridCellHeight) -
-        7;
-
+    final target = geometry.discOriginOf(move.row, move.column);
+    final startTop = -geometry.cellHeight * 1.15;
     final discColor = move.player == FourInARowPlayer.player1
         ? _bluePlayerColor
         : _redPlayerColor;
 
-    return Positioned.fill(
-      child: ClipRect(
-        clipper: _BoardInnerClipper(),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            AnimatedBuilder(
-              animation: _fallingDiscController,
-              builder: (context, child) {
-                final progress = TweenSequence<double>([
-                  TweenSequenceItem(
-                    tween: Tween(begin: 0.0, end: 1.0)
-                        .chain(CurveTween(curve: Curves.easeIn)),
-                    weight: 34,
-                  ),
-                  TweenSequenceItem(
-                    tween: Tween(begin: 1.0, end: 0.90)
-                        .chain(CurveTween(curve: Curves.easeOutCubic)),
-                    weight: 33,
-                  ),
-                  TweenSequenceItem(
-                    tween: Tween(begin: 0.90, end: 1.0)
-                        .chain(CurveTween(curve: Curves.easeInOut)),
-                    weight: 33,
-                  ),
-                ]).evaluate(_fallingDiscController);
-                final startTop = -gridCellHeight * 1.15;
-                final targetTop =
-                    frameVerticalPadding + (move.row * gridCellHeight) +
-                        ((gridCellHeight - discSize) / 2);
-                final top = startTop + ((targetTop - startTop) * progress);
-                final left = frameHorizontalPadding +
-                    (move.column * gridCellWidth) +
-                    ((gridCellWidth - discSize) / 2);
+    return AnimatedBuilder(
+      animation: _fallingDiscController,
+      builder: (context, child) {
+        final progress = TweenSequence<double>([
+          TweenSequenceItem(
+            tween: Tween(begin: 0.0, end: 1.0)
+                .chain(CurveTween(curve: Curves.easeIn)),
+            weight: 34,
+          ),
+          TweenSequenceItem(
+            tween: Tween(begin: 1.0, end: 0.90)
+                .chain(CurveTween(curve: Curves.easeOutCubic)),
+            weight: 33,
+          ),
+          TweenSequenceItem(
+            tween: Tween(begin: 0.90, end: 1.0)
+                .chain(CurveTween(curve: Curves.easeInOut)),
+            weight: 33,
+          ),
+        ]).evaluate(_fallingDiscController);
+        final top = startTop + ((target.dy - startTop) * progress);
 
-                return Positioned(
-                  left: left,
-                  top: top,
-                  width: discSize,
-                  height: discSize,
-                  child: child!,
-                );
-              },
-              child: _buildDisc(discColor),
-            ),
-          ],
-        ),
-      ),
+        return Positioned(
+          left: target.dx,
+          top: top,
+          width: geometry.discSize,
+          height: geometry.discSize,
+          child: child!,
+        );
+      },
+      child: _buildDisc(discColor),
     );
   }
 
@@ -744,7 +861,10 @@ class _FourInARowScreenState extends State<FourInARowScreen>
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.black, width: 4),
+        border: Border.all(
+          color: Colors.black,
+          width: _BoardGeometry.holeRimWidth,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.25),
@@ -756,46 +876,33 @@ class _FourInARowScreenState extends State<FourInARowScreen>
     );
   }
 
-  /// Builds a single cell disc with standard appearance (no star icons).
+  /// Builds a single socket. It paints only the fill that is seen through the
+  /// hole; the rim and the surrounding board come from [_BoardSurfacePainter].
   Widget _buildCell(int row, int col) {
+    // The engine applies a move as soon as it is made, but the destination must
+    // stay visually empty until the falling disc has actually landed in it.
     final isFallingTarget =
         _fallingDisc?.row == row && _fallingDisc?.column == col;
-    final cell =
+    final occupant =
         isFallingTarget ? null : _matchController.game.getCell(row, col);
 
-    Color discColor;
-    if (cell == FourInARowPlayer.player1) {
-      discColor = _bluePlayerColor;
-    } else if (cell == FourInARowPlayer.player2) {
-      discColor = _redPlayerColor;
+    Color fillColor;
+    if (occupant == FourInARowPlayer.player1) {
+      fillColor = _bluePlayerColor;
+    } else if (occupant == FourInARowPlayer.player2) {
+      fillColor = _redPlayerColor;
     } else {
-      discColor = _holeColor;
+      fillColor = _holeColor;
     }
 
     return Padding(
-      padding: const EdgeInsets.all(3.5),
-      child: Container(
-        decoration: BoxDecoration(
-            color: isFallingTarget ? Colors.transparent : discColor,
-          shape: BoxShape.circle,
-            border: isFallingTarget
-              ? null
-              : Border.all(color: Colors.black, width: 4),
-          boxShadow: cell != null
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 2.5,
-                    offset: const Offset(0, 1.5),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 1.5,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
+      padding: const EdgeInsets.all(_BoardGeometry.cellInset),
+      child: SizedBox.expand(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: fillColor,
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );
@@ -805,18 +912,12 @@ class _FourInARowScreenState extends State<FourInARowScreen>
 /// Custom painter that draws an animated glowing white winning line with node dots at each cell center.
 class _GlowingWinningLinePainter extends CustomPainter {
   final List<BoardPosition> winningPositions;
-  final double cellWidth;
-  final double cellHeight;
-  final double gridLeft;
-  final double gridTop;
+  final _BoardGeometry geometry;
   final double progress;
 
   _GlowingWinningLinePainter({
     required this.winningPositions,
-    required this.cellWidth,
-    required this.cellHeight,
-    required this.gridLeft,
-    required this.gridTop,
+    required this.geometry,
     required this.progress,
   });
 
@@ -827,15 +928,8 @@ class _GlowingWinningLinePainter extends CustomPainter {
     final first = winningPositions.first;
     final last = winningPositions.last;
 
-    final startOffset = Offset(
-      gridLeft + (first.col * cellWidth) + (cellWidth / 2),
-      gridTop + (first.row * cellHeight) + (cellHeight / 2),
-    );
-
-    final fullEndOffset = Offset(
-      gridLeft + (last.col * cellWidth) + (cellWidth / 2),
-      gridTop + (last.row * cellHeight) + (cellHeight / 2),
-    );
+    final startOffset = geometry.centerOf(first.row, first.col);
+    final fullEndOffset = geometry.centerOf(last.row, last.col);
 
     final currentEndOffset = Offset.lerp(startOffset, fullEndOffset, progress)!;
 
@@ -866,10 +960,7 @@ class _GlowingWinningLinePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     for (final pos in winningPositions) {
-      final center = Offset(
-        gridLeft + (pos.col * cellWidth) + (cellWidth / 2),
-        gridTop + (pos.row * cellHeight) + (cellHeight / 2),
-      );
+      final center = geometry.centerOf(pos.row, pos.col);
 
       // Only draw node if the animated line has reached or passed this point
       final totalDist = (fullEndOffset - startOffset).distance;
@@ -885,9 +976,6 @@ class _GlowingWinningLinePainter extends CustomPainter {
   bool shouldRepaint(covariant _GlowingWinningLinePainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.winningPositions != winningPositions ||
-        oldDelegate.cellWidth != cellWidth ||
-        oldDelegate.cellHeight != cellHeight ||
-        oldDelegate.gridLeft != gridLeft ||
-        oldDelegate.gridTop != gridTop;
+        oldDelegate.geometry != geometry;
   }
 }
