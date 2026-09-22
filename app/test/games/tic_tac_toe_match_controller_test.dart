@@ -67,4 +67,54 @@ void main() {
       expect(controller.canRevert, isFalse);
     });
   });
+
+  group('TicTacToeMatchController - Bot', () {
+    test('accepts Blue input, then produces a Red engine move', () async {
+      final controller = TicTacToeMatchController(
+        mode: GameMode.bot,
+        botThinkDuration: Duration.zero,
+      );
+      addTearDown(controller.dispose);
+
+      expect(controller.submitLocalCell(0, 0), isTrue);
+      expect(controller.game.getCell(0, 0), TicTacToePlayer.player1);
+      expect(controller.isBotThinking, isTrue);
+      expect(controller.submitLocalCell(1, 1), isFalse);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.game.moveCount, 2);
+      expect(controller.game.currentPlayer, TicTacToePlayer.player1);
+      expect(controller.supportsRevert, isFalse);
+      expect(controller.redWinnerLabel, 'BOT\nWINS!');
+    });
+
+    test('cancels a pending Bot move when restarted', () async {
+      final controller = TicTacToeMatchController(
+        mode: GameMode.bot,
+        botThinkDuration: const Duration(milliseconds: 10),
+      );
+      addTearDown(controller.dispose);
+
+      controller.submitLocalCell(0, 0);
+      controller.restart();
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(controller.game.moveCount, 0);
+      expect(controller.game.currentPlayer, TicTacToePlayer.player1);
+    });
+
+    test('cancels a pending Bot move when disposed', () async {
+      final controller = TicTacToeMatchController(
+        mode: GameMode.bot,
+        botThinkDuration: const Duration(milliseconds: 10),
+      );
+
+      controller.submitLocalCell(0, 0);
+      controller.dispose();
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(controller.game.moveCount, 1);
+      expect(controller.submitLocalCell(1, 1), isFalse);
+    });
+  });
 }

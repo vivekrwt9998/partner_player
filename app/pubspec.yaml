@@ -28,12 +28,21 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  # Pure-Dart annotations, so the physics layer can use @visibleForTesting
+  # without pulling Flutter into it.
+  meta: ^1.15.0
   flutter:
     sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+  # HTTP calls to the backend's /auth endpoints (login/signup/guest).
+  http: ^1.2.2
+
+  # Persists the logged-in session (token + user) across app restarts.
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

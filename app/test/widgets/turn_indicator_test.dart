@@ -304,6 +304,22 @@ void main() {
     });
   });
 
+  group('simultaneous layout', () {
+    testWidgets('renders nothing at all -- a game with no turns has none to show',
+        (tester) async {
+      await pumpOverlay(
+        tester,
+        layout: TurnIndicatorLayout.simultaneous,
+        first: blue,
+        second: red,
+      );
+
+      expect(find.text('BLUE TURN'), findsNothing);
+      expect(find.text('RED TURN'), findsNothing);
+      expect(find.byType(AnimatedOpacity), findsNothing);
+    });
+  });
+
   group('passAndPlay layout', () {
     testWidgets('shows a single bottom-center indicator for the active player',
         (tester) async {

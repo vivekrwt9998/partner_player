@@ -61,6 +61,16 @@ enum TurnIndicatorLayout {
   /// layout, one near the bottom). One curved badge per player, anchored to
   /// their own side; each shows/hides with its own player's turn.
   faceToFace,
+
+  /// The game has no turns at all: both players act on the board at the
+  /// same time, continuously (Sling Puck). There is nothing to indicate, so
+  /// `TurnIndicatorOverlay` renders nothing and the game shows its own live
+  /// status instead.
+  ///
+  /// This is the one exception to "a turn indicator is required"
+  /// (AGENTS.md §10.1.3), and it is spelled out here rather than left as a
+  /// game quietly skipping the overlay.
+  simultaneous,
 }
 
 /// Supported gameplay modes across the platform.

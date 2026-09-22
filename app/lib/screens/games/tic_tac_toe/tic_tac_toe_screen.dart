@@ -89,6 +89,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
   bool _isTransitioningToResult = false;
   bool _isOptionsMenuOpen = false;
   Timer? _resultTransitionTimer;
+  int _lastHandledMoveCount = 0;
 
   @override
   void initState() {
@@ -116,24 +117,28 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
     super.dispose();
   }
 
+  /// Reacts to every controller change (a local move, a Bot reply, revert,
+  /// or restart) in one place, since a Bot's reply is applied on its own
+  /// timer rather than from [_onCellTap] (AGENTS.md §10.1.8).
   void _onMatchStateChanged() {
     if (!mounted) return;
+
+    final game = _matchController.game;
+    if (game.moveCount != _lastHandledMoveCount) {
+      _lastHandledMoveCount = game.moveCount;
+      if (game.status == TicTacToeGameStatus.won) {
+        _winningLineController.forward(from: 0.0);
+      }
+      if (game.isGameOver) {
+        _scheduleResultTransition();
+      }
+    }
     setState(() {});
   }
 
   void _onCellTap(int row, int col) {
     if (_isTransitioningToResult) return;
-
-    final game = _matchController.game;
-    final applied = _matchController.submitLocalCell(row, col);
-    if (!applied) return;
-
-    if (game.status == TicTacToeGameStatus.won) {
-      _winningLineController.forward(from: 0.0);
-    }
-    if (game.isGameOver) {
-      _scheduleResultTransition();
-    }
+    _matchController.submitLocalCell(row, col);
   }
 
   void _revertMove() {
@@ -167,7 +172,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
     if (isBlueWinner) {
       resultData = GameResultData.blueWin(label: 'BLUE PLAYER\nWINS!');
     } else if (isRedWinner) {
-      resultData = GameResultData.redWin(label: 'RED PLAYER\nWINS!');
+      resultData = GameResultData.redWin(label: _matchController.redWinnerLabel);
     } else {
       resultData = GameResultData.draw(label: 'DRAW');
     }

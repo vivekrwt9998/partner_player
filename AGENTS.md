@@ -516,6 +516,23 @@ However, this rule applies to the **game's logical/player layout**, not as an in
 
 Every turn-based game must clearly communicate whose turn it is.
 
+**Exception — games with no turns.** A game where both players act on the
+board at the same time, continuously, has no turn to indicate. Such a game
+declares `TurnIndicatorLayout.simultaneous` in its `GameDefinition`, and
+`TurnIndicatorOverlay` then renders nothing for it. The game must still
+show each player their own live status in its place (for example a count
+of what is left on their side), positioned the way a face-to-face
+indicator would be.
+
+A game may not simply omit the overlay: it declares `simultaneous` so the
+exception is visible in its metadata and in the type system rather than
+looking like an oversight. Sling Puck is currently the only such game, and
+`games_registry_test.dart` asserts that.
+
+Games with no turns also have no Revert: there is no discrete last move to
+take back, so the option is left out of their menu rather than shown
+disabled.
+
 The indicator should:
 
 * Be clearly visible

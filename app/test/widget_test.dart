@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/main.dart';
 import 'package:app/screens/game_result_screen.dart';
 import 'package:app/screens/games/four_in_a_row/four_in_a_row_screen.dart';
+import 'package:app/screens/main_shell.dart';
+
+/// These flows test the games lobby/gameplay, not authentication, so they
+/// pump [MainShell] directly rather than the full app (which now starts at
+/// the login/signup/guest gate -- see app/lib/screens/auth/auth_gate.dart).
 
 void main() {
   testWidgets('Complete Flow: Lobby -> Details -> Landscape Gameplay with Single Active Indicator',
@@ -12,7 +16,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
 
-    await tester.pumpWidget(const PartnerGameApp());
+    await tester.pumpWidget(const MaterialApp(home: MainShell()));
     await tester.pumpAndSettle();
 
     // 1. Verify Lobby
@@ -119,7 +123,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
 
-    await tester.pumpWidget(const PartnerGameApp());
+    await tester.pumpWidget(const MaterialApp(home: MainShell()));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Four in a Row'));
     await tester.pumpAndSettle();

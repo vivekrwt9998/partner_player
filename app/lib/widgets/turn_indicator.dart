@@ -72,6 +72,9 @@ class TurnIndicatorOverlay extends StatelessWidget {
                 isGameOver: isGameOver,
                 availableSize: size,
               ),
+            // A game with no turns has nothing to indicate; it shows its
+            // own live status instead. See the enum's own documentation.
+            TurnIndicatorLayout.simultaneous => const SizedBox.shrink(),
           };
         },
       ),

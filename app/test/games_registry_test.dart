@@ -1,5 +1,6 @@
 import 'package:app/data/games_registry.dart';
 import 'package:app/models/game_definition.dart';
+import 'package:app/navigation/game_launcher.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// `GameDefinition.orientationBehavior` has no default value (AGENTS.md
@@ -50,6 +51,81 @@ void main() {
     expect(ticTacToe.status, GameStatus.available);
   });
 
+  test('Checkers is fixedPortrait with the faceToFace indicator', () {
+    final checkers = gameById('checkers');
+    expect(
+      checkers.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
+    );
+    expect(checkers.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(
+      checkers.localInteractionType,
+      LocalInteractionType.sharedDevice,
+    );
+    expect(checkers.status, GameStatus.available);
+  });
+
+  test('Tetra Tower is fixedPortrait with the faceToFace indicator', () {
+    final tetraTower = gameById('tetra_tower');
+    expect(
+      tetraTower.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
+    );
+    expect(tetraTower.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(
+      tetraTower.localInteractionType,
+      LocalInteractionType.sharedDevice,
+    );
+    expect(tetraTower.status, GameStatus.available);
+  });
+
+  test('Sling Puck is fixedPortrait and, uniquely, has no turns', () {
+    final slingPuck = gameById('sling_puck');
+    expect(
+      slingPuck.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
+    );
+    // Both players scrabble at the board at once, so there is no turn to
+    // indicate. This is the platform's one exception to AGENTS.md §10.1.3
+    // and it is declared here rather than quietly skipped by the screen.
+    expect(slingPuck.turnIndicatorLayout, TurnIndicatorLayout.simultaneous);
+    expect(
+      slingPuck.localInteractionType,
+      LocalInteractionType.sharedDevice,
+    );
+    expect(slingPuck.status, GameStatus.available);
+  });
+
+  test('Sling Puck is the only game without turns', () {
+    final simultaneous = kGames
+        .where((g) => g.turnIndicatorLayout == TurnIndicatorLayout.simultaneous)
+        .map((g) => g.id)
+        .toList();
+    expect(simultaneous, ['sling_puck']);
+  });
+
+  test('Color War is fixedPortrait with the faceToFace indicator', () {
+    final colorWar = gameById('color_war');
+    expect(
+      colorWar.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
+    );
+    expect(colorWar.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(
+      colorWar.localInteractionType,
+      LocalInteractionType.sharedDevice,
+    );
+    expect(colorWar.status, GameStatus.available);
+  });
+
+  test('Color War offers both its offline modes, but not Online yet', () {
+    final colorWar = gameById('color_war');
+
+    expect(GameLauncher.isModeAvailable(colorWar, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(colorWar, GameMode.bot), isTrue);
+    expect(GameLauncher.isModeAvailable(colorWar, GameMode.online), isFalse);
+  });
+
   test(
       'Battleship uses the adaptive placeholder pending its own gameplay '
       'screen', () {
@@ -60,5 +136,13 @@ void main() {
       gameById('battleship').orientationBehavior,
       GameOrientationBehavior.adaptive,
     );
+  });
+
+  test('Sling Puck offers both its offline modes, but not Online yet', () {
+    final slingPuck = gameById('sling_puck');
+
+    expect(GameLauncher.isModeAvailable(slingPuck, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(slingPuck, GameMode.bot), isTrue);
+    expect(GameLauncher.isModeAvailable(slingPuck, GameMode.online), isFalse);
   });
 }

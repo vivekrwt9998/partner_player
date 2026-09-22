@@ -4,14 +4,14 @@ import 'package:app/screens/games/tic_tac_toe/tic_tac_toe_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Future<void> _pumpGameScreen(WidgetTester tester) async {
+Future<void> _pumpGameScreen(WidgetTester tester, {GameMode mode = GameMode.local}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
   await tester.pumpWidget(
-    const MaterialApp(home: TicTacToeScreen(mode: GameMode.local)),
+    MaterialApp(home: TicTacToeScreen(mode: mode)),
   );
   await tester.pumpAndSettle();
 }
@@ -164,5 +164,39 @@ void main() {
 
     expect(_opacityOfLabel(tester, 'BLUE TURN'), 1.0);
     expect(_scaleOf(tester, 1, 1), 0.0);
+  });
+
+  testWidgets('Bot mode opens the shared gameplay screen without Revert',
+      (WidgetTester tester) async {
+    await _pumpGameScreen(tester, mode: GameMode.bot);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Restart'), findsOneWidget);
+    expect(find.text('Exit Game'), findsOneWidget);
+    expect(find.text('Revert'), findsNothing);
+  });
+
+  testWidgets('Bot mode: a human move is automatically followed by a Bot reply',
+      (WidgetTester tester) async {
+    await _pumpGameScreen(tester, mode: GameMode.bot);
+
+    await tester.tap(_cell(0, 0));
+    await tester.pumpAndSettle();
+
+    expect(_scaleOf(tester, 0, 0), 1.0);
+    expect(_markPainterName(tester, 0, 0), contains('OMarkPainter'));
+    // The Bot's own reply has landed somewhere else on the board and play is
+    // back with Blue, without any further input from the test.
+    expect(_opacityOfLabel(tester, 'BLUE TURN'), 1.0);
+    var redMarks = 0;
+    for (var row = 0; row < TicTacToeGame.rows; row++) {
+      for (var col = 0; col < TicTacToeGame.cols; col++) {
+        if (_markPainterName(tester, row, col).contains('XMarkPainter')) {
+          redMarks++;
+        }
+      }
+    }
+    expect(redMarks, 1);
   });
 }
