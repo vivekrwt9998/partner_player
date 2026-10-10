@@ -248,7 +248,13 @@ void main() {
     });
 
     test('a struck piece picks up a boost of its own', () {
-      final game = SlingPuckGame();
+      // reboostFactor lowered just for this scenario: at the app's current
+      // tuning, V_CRUISE * reboostFactor lands exactly at V_LAUNCH, and a
+      // struck piece's post-collision speed can never exceed the striker's
+      // (itself capped at V_LAUNCH), so no ordinary hit can clear that bar.
+      // This test exercises the _reboost mechanism itself, independent of
+      // where the live default happens to sit.
+      final game = SlingPuckGame(tuning: _t.copyWith(reboostFactor: 1.1));
       game.debugConfigure(
         pieces: [
           Piece(id: 0, owner: _p1, x: 0.5, y: 1.6),
@@ -257,7 +263,7 @@ void main() {
         winCheck: false,
       );
 
-      game.throwPieceById(0, 0, -_t.launchSpeed);
+      game.throwPieceById(0, 0, -game.tuning.launchSpeed);
       for (var i = 0; i < 40; i++) {
         game.stepOnce();
       }

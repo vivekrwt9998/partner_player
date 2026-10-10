@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/favourite_games.dart';
 import '../models/game_definition.dart';
 import '../navigation/game_launcher.dart';
 
@@ -19,7 +20,23 @@ class GameDetailsScreen extends StatefulWidget {
 }
 
 class _GameDetailsScreenState extends State<GameDetailsScreen> {
-  bool _isFavorite = false;
+  final FavouriteGames _favourites = FavouriteGames.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _favourites.addListener(_onFavouritesChanged);
+  }
+
+  @override
+  void dispose() {
+    _favourites.removeListener(_onFavouritesChanged);
+    super.dispose();
+  }
+
+  void _onFavouritesChanged() {
+    if (mounted) setState(() {});
+  }
 
   void _showHowToPlay(BuildContext context) {
     final rules = widget.game.howToPlayRules;
@@ -147,17 +164,20 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
       appBar: AppBar(
         title: const Text('Game Details'),
         actions: [
+          // The same star the lobby card carries, backed by the same
+          // set -- starring here pins the game at the top of the lobby.
           IconButton(
             icon: Icon(
-              _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: _isFavorite ? Colors.redAccent : null,
+              _favourites.contains(game.id)
+                  ? Icons.star_rounded
+                  : Icons.star_outline_rounded,
+              color:
+                  _favourites.contains(game.id) ? const Color(0xFFFFC42E) : null,
             ),
-            tooltip: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
-            onPressed: () {
-              setState(() {
-                _isFavorite = !_isFavorite;
-              });
-            },
+            tooltip: _favourites.contains(game.id)
+                ? 'Remove from favourites'
+                : 'Add to favourites',
+            onPressed: () => _favourites.toggle(game.id),
           ),
         ],
       ),

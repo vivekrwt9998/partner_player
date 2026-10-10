@@ -96,12 +96,39 @@ void main() {
     expect(slingPuck.status, GameStatus.available);
   });
 
-  test('Sling Puck is the only game without turns', () {
+  test('only the real-time games declare no turns', () {
+    // The AGENTS.md §10.1.3 exception is for games where both players act
+    // on the board at the same time, continuously. Every other game owes
+    // its players a turn indicator, so this list is deliberately short
+    // and spelled out rather than left to drift.
     final simultaneous = kGames
         .where((g) => g.turnIndicatorLayout == TurnIndicatorLayout.simultaneous)
         .map((g) => g.id)
         .toList();
-    expect(simultaneous, ['sling_puck']);
+    expect(simultaneous, ['sling_puck', 'air_hockey']);
+  });
+
+  test('Air Hockey is fixedPortrait and, like Sling Puck, has no turns', () {
+    final airHockey = gameById('air_hockey');
+
+    expect(
+      airHockey.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
+    );
+    expect(airHockey.turnIndicatorLayout, TurnIndicatorLayout.simultaneous);
+    expect(airHockey.localInteractionType, LocalInteractionType.sharedDevice);
+    expect(airHockey.status, GameStatus.available);
+    expect(airHockey.playerCount, 2);
+  });
+
+  test('Air Hockey offers both its offline modes, but not Online yet', () {
+    final airHockey = gameById('air_hockey');
+
+    expect(airHockey.supportedModes,
+        [GameMode.local, GameMode.bot, GameMode.online]);
+    expect(GameLauncher.isModeAvailable(airHockey, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(airHockey, GameMode.bot), isTrue);
+    expect(GameLauncher.isModeAvailable(airHockey, GameMode.online), isFalse);
   });
 
   test('Color War is fixedPortrait with the faceToFace indicator', () {
@@ -126,16 +153,116 @@ void main() {
     expect(GameLauncher.isModeAvailable(colorWar, GameMode.online), isFalse);
   });
 
-  test(
-      'Battleship uses the adaptive placeholder pending its own gameplay '
-      'screen', () {
-    // Not a final product decision — see the comments in games_registry.dart.
-    // Pinning this down so it changes deliberately, not silently, once the
-    // game actually gets a screen designed.
+  test('Reversi is fixedPortrait with the faceToFace indicator', () {
+    final reversi = gameById('reversi');
     expect(
-      gameById('battleship').orientationBehavior,
-      GameOrientationBehavior.adaptive,
+      reversi.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
     );
+    expect(reversi.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(
+      reversi.localInteractionType,
+      LocalInteractionType.sharedDevice,
+    );
+    expect(reversi.status, GameStatus.available);
+    expect(reversi.playerCount, 2);
+  });
+
+  test('Reversi offers both its offline modes, but not Online yet', () {
+    final reversi = gameById('reversi');
+
+    expect(reversi.supportedModes,
+        [GameMode.local, GameMode.bot, GameMode.online]);
+    expect(GameLauncher.isModeAvailable(reversi, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(reversi, GameMode.bot), isTrue);
+    expect(GameLauncher.isModeAvailable(reversi, GameMode.online), isFalse);
+  });
+
+  test('Dots and Boxes is fixedPortrait with the faceToFace indicator', () {
+    final dotsAndBoxes = gameById('dots_and_boxes');
+    expect(
+      dotsAndBoxes.orientationBehavior,
+      GameOrientationBehavior.fixedPortrait,
+    );
+    expect(dotsAndBoxes.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(
+      dotsAndBoxes.localInteractionType,
+      LocalInteractionType.sharedDevice,
+    );
+    expect(dotsAndBoxes.status, GameStatus.available);
+    expect(dotsAndBoxes.playerCount, 2);
+  });
+
+  test('Dots and Boxes offers both its offline modes, but not Online yet',
+      () {
+    final dotsAndBoxes = gameById('dots_and_boxes');
+
+    expect(dotsAndBoxes.supportedModes,
+        [GameMode.local, GameMode.bot, GameMode.online]);
+    expect(GameLauncher.isModeAvailable(dotsAndBoxes, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(dotsAndBoxes, GameMode.bot), isTrue);
+    expect(
+        GameLauncher.isModeAvailable(dotsAndBoxes, GameMode.online), isFalse);
+  });
+
+  test('Hex is fixedPortrait with the faceToFace indicator', () {
+    final hex = gameById('hex');
+    expect(hex.orientationBehavior, GameOrientationBehavior.fixedPortrait);
+    expect(hex.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(hex.localInteractionType, LocalInteractionType.sharedDevice);
+    expect(hex.status, GameStatus.available);
+    expect(hex.playerCount, 2);
+  });
+
+  test('Hex offers both its offline modes, but not Online yet', () {
+    final hex = gameById('hex');
+
+    expect(hex.supportedModes, [GameMode.local, GameMode.bot, GameMode.online]);
+    expect(GameLauncher.isModeAvailable(hex, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(hex, GameMode.bot), isTrue);
+    expect(GameLauncher.isModeAvailable(hex, GameMode.online), isFalse);
+  });
+
+  test('Snakes and Ladders is fixedPortrait with the faceToFace indicator',
+      () {
+    final snakes = gameById('snakes_and_ladders');
+
+    expect(snakes.orientationBehavior, GameOrientationBehavior.fixedPortrait);
+    expect(snakes.turnIndicatorLayout, TurnIndicatorLayout.faceToFace);
+    expect(snakes.localInteractionType, LocalInteractionType.sharedDevice);
+    expect(snakes.status, GameStatus.available);
+    expect(snakes.playerCount, 2);
+  });
+
+  test('Snakes and Ladders offers only its Local mode so far', () {
+    final snakes = gameById('snakes_and_ladders');
+
+    expect(snakes.supportedModes,
+        [GameMode.local, GameMode.bot, GameMode.online]);
+    expect(GameLauncher.isModeAvailable(snakes, GameMode.local), isTrue);
+    expect(GameLauncher.isModeAvailable(snakes, GameMode.bot), isFalse);
+    expect(GameLauncher.isModeAvailable(snakes, GameMode.online), isFalse);
+  });
+
+  test('every catalogue entry is playable, in the lobby order', () {
+    // Battleship was a placeholder with no gameplay screen and has been
+    // taken out; the two games that still only have a Local mode sit at
+    // the end. kGames order is the lobby order.
+    expect(kGames.map((g) => g.id).toList(), [
+      'four_in_a_row',
+      'tic_tac_toe',
+      'checkers',
+      'sling_puck',
+      'color_war',
+      'reversi',
+      'dots_and_boxes',
+      'hex',
+      'air_hockey',
+      'soccer_pool',
+      'tetra_tower',
+      'snakes_and_ladders',
+    ]);
+    expect(kGames.every((g) => g.status == GameStatus.available), isTrue);
   });
 
   test('Sling Puck offers both its offline modes, but not Online yet', () {

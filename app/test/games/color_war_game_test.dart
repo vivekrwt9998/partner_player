@@ -5,9 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 const _p1 = ColorWarPlayer.player1;
 const _p2 = ColorWarPlayer.player2;
 
-/// One short of bursting.
-const _primed = ColorWarGame.burstLimit - 1;
-
 /// Builds a 5x5 board from a compact description.
 ///
 /// Each entry is `row, col, owner, orbs`; everything else is empty.
@@ -38,24 +35,14 @@ void main() {
       expect(game.canRevert, isFalse);
     });
 
-    test('every cell holds four orbs, corner or middle alike', () {
-      expect(ColorWarGame.burstLimit, 4);
+    test('a cell bursts at one orb per neighbour', () {
+      final game = ColorWarGame();
 
-      // A corner is no more fragile than anywhere else: three orbs sit
-      // there quite happily.
-      for (final corner in const [(0, 0), (0, 4), (4, 0), (4, 4)]) {
-        final game = ColorWarGame()
-          ..debugConfigure(
-            cells: _board([(corner.$1, corner.$2, _p1, 2), (2, 2, _p2, 1)]),
-            currentPlayer: _p1,
-          );
-
-        game.tryPlaceOrb(corner.$1, corner.$2);
-
-        expect(game.hasPendingBlasts, isFalse,
-            reason: 'three orbs in corner $corner must not burst');
-        expect(game.cellAt(corner.$1, corner.$2).orbs, _primed);
-      }
+      expect(game.criticalMass(0, 0), 2, reason: 'corner');
+      expect(game.criticalMass(0, 2), 3, reason: 'top edge');
+      expect(game.criticalMass(2, 0), 3, reason: 'left edge');
+      expect(game.criticalMass(2, 2), 4, reason: 'middle');
+      expect(game.criticalMass(4, 4), 2, reason: 'far corner');
     });
   });
 
@@ -102,14 +89,14 @@ void main() {
   });
 
   group('Bursting', () {
-    test('a cell empties at four orbs and feeds each neighbour one', () {
+    test('a corner bursts at two orbs and paints both neighbours', () {
       final game = ColorWarGame()
         ..debugConfigure(
-          cells: _board([(2, 2, _p1, _primed), (4, 4, _p2, 1)]),
+          cells: _board([(0, 0, _p1, 1), (4, 4, _p2, 1)]),
           currentPlayer: _p1,
         );
 
-      final move = game.tryPlaceOrb(2, 2);
+      final move = game.tryPlaceOrb(0, 0);
 
       expect(move!.willExplode, isTrue);
       expect(game.currentPlayer, _p1,
@@ -117,39 +104,42 @@ void main() {
 
       final blast = game.stepBlast();
 
-      expect(blast!.sources, [const ColorWarPosition(2, 2)]);
-      expect(game.cellAt(2, 2), ColorWarCell.empty);
-      for (final neighbour in const [(1, 2), (3, 2), (2, 1), (2, 3)]) {
-        expect(game.cellAt(neighbour.$1, neighbour.$2),
-            const ColorWarCell(owner: _p1, orbs: 1),
-            reason: 'neighbour $neighbour');
-      }
+      expect(blast!.sources, [const ColorWarPosition(0, 0)]);
+      expect(game.cellAt(0, 0), ColorWarCell.empty);
+      expect(game.cellAt(0, 1), const ColorWarCell(owner: _p1, orbs: 1));
+      expect(game.cellAt(1, 0), const ColorWarCell(owner: _p1, orbs: 1));
       expect(game.hasPendingBlasts, isFalse);
       expect(game.currentPlayer, _p2, reason: 'settled, so the turn passes');
     });
 
-    test('a cell at the rim loses the orbs it has no neighbour for', () {
+    test('a middle cell holds three orbs and only bursts on the fourth', () {
       final game = ColorWarGame()
         ..debugConfigure(
-          cells: _board([(0, 0, _p1, _primed), (4, 4, _p2, 1)]),
+          cells: _board([(2, 2, _p1, 2), (4, 4, _p2, 1)]),
           currentPlayer: _p1,
         );
 
-      game.tryPlaceOrb(0, 0);
-      game.settle();
+      game.tryPlaceOrb(2, 2);
+      expect(game.hasPendingBlasts, isFalse, reason: 'three of four orbs');
+      expect(game.cellAt(2, 2).orbs, 3);
 
-      expect(game.cellAt(0, 0), ColorWarCell.empty);
-      expect(game.cellAt(0, 1), const ColorWarCell(owner: _p1, orbs: 1));
-      expect(game.cellAt(1, 0), const ColorWarCell(owner: _p1, orbs: 1));
-      expect(game.orbsOwnedBy(_p1), 2,
-          reason: 'a corner has two neighbours, so two orbs go over the edge');
+      game.tryPlaceOrb(4, 0); // Red, somewhere harmless.
+      game.tryPlaceOrb(2, 2); // Blue again -- now it goes.
+
+      expect(game.hasPendingBlasts, isTrue);
+      game.settle();
+      expect(game.cellAt(2, 2), ColorWarCell.empty);
+      for (final neighbour in const [(1, 2), (3, 2), (2, 1), (2, 3)]) {
+        expect(game.cellAt(neighbour.$1, neighbour.$2).owner, _p1,
+            reason: 'neighbour $neighbour');
+      }
     });
 
     test('a burst captures the opponent cells it lands on, orbs and all', () {
       final game = ColorWarGame()
         ..debugConfigure(
           cells: _board([
-            (0, 0, _p1, _primed),
+            (0, 0, _p1, 1),
             (0, 1, _p2, 1),
             (1, 0, _p2, 1),
             (4, 4, _p2, 1),
@@ -166,12 +156,13 @@ void main() {
     });
 
     test('one orb can set off several waves', () {
+      // A corner primed to burst into two more primed cells.
       final game = ColorWarGame()
         ..debugConfigure(
           cells: _board([
-            (0, 0, _p1, _primed),
-            (0, 1, _p1, _primed),
-            (1, 0, _p1, _primed),
+            (0, 0, _p1, 1),
+            (0, 1, _p1, 2),
+            (1, 0, _p1, 2),
             (4, 4, _p2, 1),
           ]),
           currentPlayer: _p1,
@@ -181,7 +172,7 @@ void main() {
 
       final first = game.stepBlast();
       expect(first!.sources, [const ColorWarPosition(0, 0)]);
-      expect(first.hasMore, isTrue, reason: 'both neighbours are now full');
+      expect(first.hasMore, isTrue, reason: 'both edge cells are now full');
 
       final second = game.stepBlast();
       expect(
@@ -197,7 +188,7 @@ void main() {
     test('the board cannot be played while a reaction is spreading', () {
       final game = ColorWarGame()
         ..debugConfigure(
-          cells: _board([(0, 0, _p1, _primed), (4, 4, _p2, 1)]),
+          cells: _board([(0, 0, _p1, 1), (4, 4, _p2, 1)]),
           currentPlayer: _p1,
         );
 
@@ -215,7 +206,7 @@ void main() {
       final game = ColorWarGame()
         ..debugConfigure(
           cells: _board([
-            (0, 0, _p1, _primed),
+            (0, 0, _p1, 1),
             (0, 1, _p2, 1),
           ]),
           currentPlayer: _p1,
@@ -245,7 +236,7 @@ void main() {
     test('a finished game ignores further input', () {
       final game = ColorWarGame()
         ..debugConfigure(
-          cells: _board([(0, 0, _p1, _primed), (0, 1, _p2, 1)]),
+          cells: _board([(0, 0, _p1, 1), (0, 1, _p2, 1)]),
           currentPlayer: _p1,
         );
       game.tryPlaceOrb(0, 0);
@@ -256,12 +247,17 @@ void main() {
     });
 
     test('a runaway cascade still terminates', () {
-      // Every cell one orb short: the wave front sweeps the whole board.
+      // Almost every cell primed one short of bursting: the wave front
+      // sweeps the whole board.
+      final reference = ColorWarGame();
       final cells = List.generate(
         ColorWarGame.defaultSize,
         (row) => List.generate(
           ColorWarGame.defaultSize,
-          (col) => const ColorWarCell(owner: _p1, orbs: _primed),
+          (col) => ColorWarCell(
+            owner: _p1,
+            orbs: reference.criticalMass(row, col) - 1,
+          ),
         ),
       );
       cells[4][4] = const ColorWarCell(owner: _p2, orbs: 1);
@@ -282,8 +278,8 @@ void main() {
       final game = ColorWarGame()
         ..debugConfigure(
           cells: _board([
-            (0, 0, _p1, _primed),
-            (0, 1, _p1, _primed),
+            (0, 0, _p1, 1),
+            (0, 1, _p1, 2),
             (4, 4, _p2, 1),
           ]),
           currentPlayer: _p1,
@@ -311,7 +307,7 @@ void main() {
     test('revert can take back a won game', () {
       final game = ColorWarGame()
         ..debugConfigure(
-          cells: _board([(0, 0, _p1, _primed), (0, 1, _p2, 1)]),
+          cells: _board([(0, 0, _p1, 1), (0, 1, _p2, 1)]),
           currentPlayer: _p1,
         );
       game.tryPlaceOrb(0, 0);

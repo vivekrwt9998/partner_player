@@ -3,15 +3,14 @@ import '../models/color_war_models.dart';
 /// Pure Dart game engine for Color War (a chain-reaction game).
 ///
 /// Rules:
-/// - A square grid of cells. Every cell holds the same [burstLimit],
-///   wherever it sits on the board.
+/// - A square grid of cells. Each cell has a *critical mass* equal to its
+///   number of orthogonal neighbours: 2 in a corner, 3 along an edge, 4 in
+///   the middle.
 /// - On your turn you drop one orb into any empty cell, or into a cell you
 ///   already own. You may never add to the opponent's cell.
-/// - A cell that reaches [burstLimit] bursts: it empties, throwing one orb
-///   into each orthogonal neighbour, and every cell it hits turns your
-///   colour. Those cells can burst in turn, so one orb can set off a chain.
-///   A cell at the rim has fewer neighbours to throw to, so the orbs it
-///   cannot pass on are simply lost over the edge.
+/// - A cell that reaches its critical mass bursts: it throws one orb into
+///   each orthogonal neighbour, and every cell it hits turns your colour.
+///   Those cells can burst in turn, so one orb can set off a chain.
 /// - Once a player has had a turn, losing their last cell loses the game.
 ///   The board always ends up one colour, so there is no draw.
 ///
@@ -22,10 +21,6 @@ class ColorWarGame {
   /// The board the game is played on. Square, so it reads the same however
   /// the device is held.
   static const int defaultSize = 5;
-
-  /// How many orbs any cell holds before it bursts -- the same everywhere
-  /// on the board, corner or middle.
-  static const int burstLimit = 4;
 
   ColorWarGame({int rows = defaultSize, int cols = defaultSize})
       : assert(rows >= 2 && cols >= 2, 'a chain needs somewhere to spread'),
@@ -45,7 +40,7 @@ class ColorWarGame {
   /// Who set off the cascade currently in flight, if any.
   ColorWarPlayer? _blastOwner;
 
-  /// Cells at or over [burstLimit], waiting to burst.
+  /// Cells at or over their critical mass, waiting to burst.
   List<ColorWarPosition> _pending = const [];
 
   /// Players who have had at least one turn. Until a player has played,
@@ -85,6 +80,17 @@ class ColorWarGame {
   ColorWarCell cellAt(int row, int col) {
     if (!_isOnBoard(row, col)) return ColorWarCell.empty;
     return _board[row][col];
+  }
+
+  /// How many orbs a cell has to collect before it bursts: one per
+  /// orthogonal neighbour, so 2 in a corner, 3 on an edge, 4 in the middle.
+  int criticalMass(int row, int col) {
+    var neighbours = 0;
+    if (row > 0) neighbours++;
+    if (row < rows - 1) neighbours++;
+    if (col > 0) neighbours++;
+    if (col < cols - 1) neighbours++;
+    return neighbours;
   }
 
   /// The score shown to players: how many cells of the board [player] holds.
@@ -149,8 +155,8 @@ class ColorWarGame {
     );
   }
 
-  /// Bursts every cell that is currently at or over [burstLimit], all at
-  /// once, and returns what happened.
+  /// Bursts every cell that is currently at or over its critical mass, all
+  /// at once, and returns what happened.
   ///
   /// Returns `null` when there was nothing left to burst.
   ColorWarBlast? stepBlast() {
@@ -164,7 +170,7 @@ class ColorWarGame {
     // cells bursting into each other in the same wave both get their orb.
     for (final position in sources) {
       final cell = _board[position.row][position.col];
-      final left = cell.orbs - burstLimit;
+      final left = cell.orbs - criticalMass(position.row, position.col);
       _board[position.row][position.col] =
           left > 0 ? ColorWarCell(owner: cell.owner, orbs: left) : ColorWarCell.empty;
     }
@@ -194,9 +200,9 @@ class ColorWarGame {
   /// for tests. The screen steps wave by wave instead, so players can see
   /// the reaction spread.
   ///
-  /// [maxWaves] is a safety net only: a burst never hands out more orbs
-  /// than it swallowed, and loses any it has no neighbour for, so the orb
-  /// count can only fall and a cascade always runs out.
+  /// [maxWaves] is a safety net only: a cascade ends once one colour owns
+  /// the board, which is also the win condition, so it cannot legitimately
+  /// run forever.
   void settle({int maxWaves = 500}) {
     var waves = 0;
     while (hasPendingBlasts && !isGameOver && waves < maxWaves) {
@@ -288,7 +294,7 @@ class ColorWarGame {
     List<ColorWarPosition>? ready;
     for (var row = 0; row < rows; row++) {
       for (var col = 0; col < cols; col++) {
-        if (_board[row][col].orbs >= burstLimit) {
+        if (_board[row][col].orbs >= criticalMass(row, col)) {
           (ready ??= <ColorWarPosition>[]).add(ColorWarPosition(row, col));
         }
       }

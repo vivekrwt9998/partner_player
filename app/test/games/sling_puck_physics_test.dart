@@ -110,7 +110,7 @@ double _clearanceToBars(Piece piece) => min(
 
 void main() {
   group('A - a slow, square press still earns a full launch', () {
-    test('depth grows linearly and releases at about 0.9 s', () {
+    test('depth grows linearly and releases at about 1.6 s', () {
       final game = _board([_atTopBand()]);
       final piece = game.getPiece(0)!;
       expect(game.grab(0, _p2), isTrue);
@@ -132,14 +132,14 @@ void main() {
             reason: 'depth grows at the press speed, i.e. linearly');
       }
 
-      while (elapsed < 1.2 && _depthOf(game, _p2) < _t.maxStretch - 1e-6) {
+      while (elapsed < 2.0 && _depthOf(game, _p2) < _t.maxStretch - 1e-6) {
         y -= 0.1 * _dt;
         game.moveHeld(_p2, x, y);
         game.stepOnce();
         elapsed += _dt;
       }
 
-      expect(elapsed, closeTo(0.9, 0.09),
+      expect(elapsed, closeTo(1.6, 0.16),
           reason: 'the band reaches its limit at the press speed');
 
       game.release(_p2);
@@ -260,15 +260,21 @@ void main() {
 
       var overshoot = 0.0;
       var elapsed = crossedAt;
-      while (elapsed < 0.4) {
+      while (elapsed < 0.6) {
         game.stepOnce();
         elapsed += _dt;
         overshoot = min(overshoot, game.topBand.depth);
       }
-      expect(-overshoot, closeTo(0.02, 0.009),
-          reason: 'about 20% of D_MAX, past flat toward the field');
+      // The overshoot fraction of D_MAX is set by bandZeta's damping ratio,
+      // not by D_MAX itself -- at zeta=0.35 that fraction works out to
+      // ~31%, so it scales automatically if D_MAX changes again.
+      expect(-overshoot, closeTo(0.049, 0.01),
+          reason: 'about 31% of D_MAX, past flat toward the field');
+      // Settling time (envelope decaying below bandSettleFraction) scales
+      // with 1/(zeta*omega); at zeta=0.35 that's ~0.48 s from release, so
+      // the window needs more room than the old zeta=0.45 needed.
       expect(game.topBand.phase, BandPhase.idle,
-          reason: 'settled inside 0.4 s after release');
+          reason: 'settled inside 0.6 s after release');
     });
 
     test('letting go of a barely-touched band is not a shot', () {

@@ -142,13 +142,13 @@ void main() {
     expect(landscapeRect.width, closeTo(landscapeRect.height, 0.5));
     expect(tester.takeException(), isNull);
 
-    final score = tester
-        .widgetList<Text>(find.descendant(
-          of: find.byKey(const ValueKey('color_war_score')),
-          matching: find.byType(Text),
+    final claimed = tester
+        .widgetList<AnimatedScale>(find.descendant(
+          of: find.byKey(const ValueKey('color_war_board')),
+          matching: find.byType(AnimatedScale),
         ))
-        .map((text) => text.data!)
-        .toList();
-    expect(score.first, '1', reason: 'the match survived the rotation');
+        .where((scale) => scale.scale == 1.0)
+        .length;
+    expect(claimed, 1, reason: 'the match survived the rotation');
   });
 }

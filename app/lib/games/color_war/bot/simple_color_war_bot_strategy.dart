@@ -14,6 +14,9 @@ class SimpleColorWarBotStrategy {
   /// A win is worth more than any board could be.
   static const double _decisive = 1000000;
 
+  /// Corners and edges burst sooner, so they are worth holding.
+  static const double _lowCriticalMassBonus = 0.8;
+
   /// How much it dislikes leaving a cell the opponent can burst next turn.
   static const double _exposurePenalty = 2.5;
 
@@ -50,9 +53,12 @@ class SimpleColorWarBotStrategy {
 
     final cellLead = trial.cellsOwnedBy(me) - trial.cellsOwnedBy(me.opponent);
     final orbLead = trial.orbsOwnedBy(me) - trial.orbsOwnedBy(me.opponent);
+    final cornerValue =
+        (4 - trial.criticalMass(row, col)) * _lowCriticalMassBonus;
 
     return (cellLead * 3.0) +
-        orbLead -
+        orbLead +
+        cornerValue -
         (_countExposedCells(trial, me) * _exposurePenalty);
   }
 
@@ -86,7 +92,7 @@ class SimpleColorWarBotStrategy {
 
       final neighbour = game.cellAt(r, c);
       if (neighbour.owner == null || neighbour.owner == player) continue;
-      if (neighbour.orbs >= ColorWarGame.burstLimit - 1) return true;
+      if (neighbour.orbs >= game.criticalMass(r, c) - 1) return true;
     }
 
     return false;

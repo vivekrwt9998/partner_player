@@ -45,17 +45,27 @@ double _opacityOfLabel(WidgetTester tester, String label) {
   return opacity.opacity;
 }
 
-/// The two numbers on the score pill: tiles held by Blue, then by Red.
-(String, String) _score(WidgetTester tester) {
-  final texts = tester
-      .widgetList<Text>(find.descendant(
-        of: find.byKey(const ValueKey('color_war_score')),
-        matching: find.byType(Text),
-      ))
-      .map((text) => text.data!)
-      .toList();
-  return (texts.first, texts.last);
-}
+/// How many tiles are holding a disc right now.
+///
+/// There is no scoreboard on screen -- the board is the score -- so a test
+/// reads the board itself. An empty tile keeps its disc scaled to zero,
+/// which is what tells the two apart.
+int _occupiedTiles(WidgetTester tester) => tester
+    .widgetList<AnimatedScale>(find.descendant(
+      of: find.byKey(const ValueKey('color_war_board')),
+      matching: find.byType(AnimatedScale),
+    ))
+    .where((scale) => scale.scale == 1.0)
+    .length;
+
+bool _isOccupied(WidgetTester tester, int row, int col) =>
+    tester
+        .widget<AnimatedScale>(find.descendant(
+          of: find.byKey(ValueKey('cw_cell_${row}_$col')),
+          matching: find.byType(AnimatedScale),
+        ))
+        .scale ==
+    1.0;
 
 void main() {
   testWidgets('renders a square board of tappable cells',
@@ -71,13 +81,13 @@ void main() {
     }
   });
 
-  testWidgets('starts on Blue\'s turn with an empty scoreboard',
+  testWidgets('starts on Blue\'s turn with an empty board',
       (WidgetTester tester) async {
     await _pumpGameScreen(tester);
 
     expect(_opacityOfLabel(tester, 'BLUE TURN'), 1.0);
     expect(_opacityOfLabel(tester, 'RED TURN'), 0.0);
-    expect(_score(tester), ('0', '0'));
+    expect(_occupiedTiles(tester), 0);
   });
 
   testWidgets('dropping an orb claims the tile and passes the turn',
@@ -86,7 +96,8 @@ void main() {
 
     await _tapCell(tester, 2, 2);
 
-    expect(_score(tester), ('1', '0'));
+    expect(_isOccupied(tester, 2, 2), isTrue);
+    expect(_occupiedTiles(tester), 1);
     expect(_opacityOfLabel(tester, 'RED TURN'), 1.0);
     expect(_opacityOfLabel(tester, 'BLUE TURN'), 0.0);
   });
@@ -98,7 +109,7 @@ void main() {
     await _tapCell(tester, 2, 2);
     await _tapCell(tester, 2, 2);
 
-    expect(_score(tester), ('1', '0'), reason: 'the tap was refused');
+    expect(_occupiedTiles(tester), 1, reason: 'the second tap was refused');
     expect(_opacityOfLabel(tester, 'RED TURN'), 1.0);
   });
 
@@ -112,7 +123,10 @@ void main() {
 
     // The corner empties into (0,1) and (1,0), so Blue ends up with two
     // tiles instead of one.
-    expect(_score(tester), ('2', '1'));
+    expect(_isOccupied(tester, 0, 0), isFalse, reason: 'the corner emptied');
+    expect(_isOccupied(tester, 0, 1), isTrue);
+    expect(_isOccupied(tester, 1, 0), isTrue);
+    expect(_occupiedTiles(tester), 3);
     expect(_opacityOfLabel(tester, 'RED TURN'), 1.0,
         reason: 'the turn passes once the reaction has settled');
   });
@@ -133,14 +147,14 @@ void main() {
     await _pumpGameScreen(tester);
 
     await _tapCell(tester, 2, 2);
-    expect(_score(tester), ('1', '0'));
+    expect(_occupiedTiles(tester), 1);
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Restart'));
     await tester.pumpAndSettle();
 
-    expect(_score(tester), ('0', '0'));
+    expect(_occupiedTiles(tester), 0);
     expect(_opacityOfLabel(tester, 'BLUE TURN'), 1.0);
   });
 
@@ -154,7 +168,7 @@ void main() {
     await tester.tap(find.text('Revert'));
     await tester.pumpAndSettle();
 
-    expect(_score(tester), ('0', '0'));
+    expect(_occupiedTiles(tester), 0);
     expect(_opacityOfLabel(tester, 'BLUE TURN'), 1.0);
   });
 
@@ -176,9 +190,9 @@ void main() {
 
       await _tapCell(tester, 2, 2);
 
-      final (blue, red) = _score(tester);
-      expect(blue, '1');
-      expect(red, '1', reason: 'the bot took a tile of its own');
+      expect(_isOccupied(tester, 2, 2), isTrue);
+      expect(_occupiedTiles(tester), 2,
+          reason: 'the human tile, plus one the bot took');
       expect(_opacityOfLabel(tester, 'BLUE TURN'), 1.0);
     });
   });

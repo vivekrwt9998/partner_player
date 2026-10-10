@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/game_definition.dart';
+import '../screens/games/air_hockey/air_hockey_screen.dart';
 import '../screens/games/checkers/checkers_screen.dart';
 import '../screens/games/color_war/color_war_screen.dart';
+import '../screens/games/dots_and_boxes/dots_and_boxes_screen.dart';
 import '../screens/games/four_in_a_row/four_in_a_row_screen.dart';
+import '../screens/games/hex/hex_screen.dart';
+import '../screens/games/reversi/reversi_screen.dart';
 import '../screens/games/sling_puck/sling_puck_screen.dart';
+import '../screens/games/snakes_and_ladders/snakes_and_ladders_screen.dart';
+import '../screens/games/soccer_pool/soccer_pool_screen.dart';
 import '../screens/games/tetra_tower/tetra_tower_screen.dart';
 import '../screens/games/tic_tac_toe/tic_tac_toe_screen.dart';
 
@@ -16,10 +22,11 @@ class GameLauncher {
   static bool isModeAvailable(GameDefinition game, GameMode mode) {
     if (game.status != GameStatus.available) return false;
 
-    // Current phase: Four in a Row, Tic Tac Toe, Checkers, Sling Puck and
-    // Color War all support their offline Local and Bot modes; Tetra Tower
-    // only has its Local mode built so far (AGENTS.md §72). Online is not
-    // built yet for any of them.
+    // Current phase: Four in a Row, Tic Tac Toe, Checkers, Sling Puck,
+    // Color War, Reversi and Dots and Boxes all support their offline
+    // Local and Bot modes, and so do Hex and Air Hockey; Soccer Pool,
+    // Tetra Tower and Snakes and Ladders only have their Local mode
+    // built so far (AGENTS.md §72). Online is not built yet for any.
     return switch ((game.id, mode)) {
       ('four_in_a_row', GameMode.local) => true,
       ('four_in_a_row', GameMode.bot) => true,
@@ -32,6 +39,16 @@ class GameLauncher {
       ('sling_puck', GameMode.bot) => true,
       ('color_war', GameMode.local) => true,
       ('color_war', GameMode.bot) => true,
+      ('soccer_pool', GameMode.local) => true,
+      ('reversi', GameMode.local) => true,
+      ('reversi', GameMode.bot) => true,
+      ('dots_and_boxes', GameMode.local) => true,
+      ('dots_and_boxes', GameMode.bot) => true,
+      ('hex', GameMode.local) => true,
+      ('hex', GameMode.bot) => true,
+      ('air_hockey', GameMode.local) => true,
+      ('air_hockey', GameMode.bot) => true,
+      ('snakes_and_ladders', GameMode.local) => true,
       _ => false,
     };
   }
@@ -93,6 +110,24 @@ class GameLauncher {
         const ColorWarScreen(mode: GameMode.local),
       ('color_war', GameMode.bot) =>
         const ColorWarScreen(mode: GameMode.bot),
+      ('soccer_pool', GameMode.local) =>
+        const SoccerPoolScreen(mode: GameMode.local),
+      ('reversi', GameMode.local) =>
+        const ReversiScreen(mode: GameMode.local),
+      ('reversi', GameMode.bot) =>
+        const ReversiScreen(mode: GameMode.bot),
+      ('dots_and_boxes', GameMode.local) =>
+        const DotsAndBoxesScreen(mode: GameMode.local),
+      ('dots_and_boxes', GameMode.bot) =>
+        const DotsAndBoxesScreen(mode: GameMode.bot),
+      ('hex', GameMode.local) => const HexScreen(mode: GameMode.local),
+      ('hex', GameMode.bot) => const HexScreen(mode: GameMode.bot),
+      ('air_hockey', GameMode.local) =>
+        const AirHockeyScreen(mode: GameMode.local),
+      ('air_hockey', GameMode.bot) =>
+        const AirHockeyScreen(mode: GameMode.bot),
+      ('snakes_and_ladders', GameMode.local) =>
+        const SnakesAndLaddersScreen(mode: GameMode.local),
       _ => null,
     };
   }

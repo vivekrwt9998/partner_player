@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import '../data/favourite_games.dart';
 import '../data/games_registry.dart';
 import '../models/game_definition.dart';
 import '../widgets/game_card.dart';
@@ -20,22 +21,26 @@ class GamesScreen extends StatefulWidget {
 }
 
 class _GamesScreenState extends State<GamesScreen> {
-  /// Starred games, by id. Kept for this run of the app only: there is no
-  /// per-user storage on the device yet, and favourites are not worth
-  /// inventing one for on their own.
-  final Set<String> _favourites = {};
+  /// Shared with the Game Details screen, so a game starred from either
+  /// place is pinned in both.
+  final FavouriteGames _favourites = FavouriteGames.instance;
 
   final Random _random = Random();
 
-  /// Favourites float to the front; everything else keeps the catalogue's
-  /// own order.
-  List<GameDefinition> get _orderedGames {
-    final starred = <GameDefinition>[];
-    final rest = <GameDefinition>[];
-    for (final game in kGames) {
-      (_favourites.contains(game.id) ? starred : rest).add(game);
-    }
-    return [...starred, ...rest];
+  @override
+  void initState() {
+    super.initState();
+    _favourites.addListener(_onFavouritesChanged);
+  }
+
+  @override
+  void dispose() {
+    _favourites.removeListener(_onFavouritesChanged);
+    super.dispose();
+  }
+
+  void _onFavouritesChanged() {
+    if (mounted) setState(() {});
   }
 
   void _openDetails(GameDefinition game) {
@@ -47,10 +52,6 @@ class _GamesScreenState extends State<GamesScreen> {
     );
   }
 
-  void _toggleFavourite(GameDefinition game) => setState(() {
-        if (!_favourites.remove(game.id)) _favourites.add(game.id);
-      });
-
   void _openRandomGame() {
     final playable =
         kGames.where((g) => g.status == GameStatus.available).toList();
@@ -60,7 +61,7 @@ class _GamesScreenState extends State<GamesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final games = _orderedGames;
+    final games = _favourites.pinnedFirst(kGames, (game) => game.id);
 
     return Stack(
       children: [
@@ -78,12 +79,15 @@ class _GamesScreenState extends State<GamesScreen> {
                   // phone still gets two, but a tablet or a landscape
                   // window gets more of them instead of a handful of
                   // enormous cards (AGENTS.md §8.4).
+                  //
+                  // A card carries only the game's name, so it wants to be
+                  // wide and short rather than square.
                   gridDelegate:
                       const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 220,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.88,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    childAspectRatio: 1.5,
                   ),
                   itemCount: games.length,
                   itemBuilder: (context, index) {
@@ -91,7 +95,7 @@ class _GamesScreenState extends State<GamesScreen> {
                     return GameCard(
                       game: game,
                       isFavourite: _favourites.contains(game.id),
-                      onToggleFavourite: () => _toggleFavourite(game),
+                      onToggleFavourite: () => _favourites.toggle(game.id),
                       onTap: () => _openDetails(game),
                     );
                   },
